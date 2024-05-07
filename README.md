@@ -6,7 +6,7 @@
 [![CI](https://github.com/ustunb/reachml/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/ci.yml)
 
 
-Library for recourse verifictaion and the accompanying code for the paper "[Prediction without Preclusion: Recourse Verification with Reachable Sets](https://arxiv.org/abs/2308.12820)" (ICLR 2024 Spotlight).
+Library for recourse verification and the accompanying code for the paper "[Prediction without Preclusion: Recourse Verification with Reachable Sets](https://arxiv.org/abs/2308.12820)" (ICLR 2024 Spotlight).
 
 ## Getting Started
 
@@ -15,4 +15,12 @@ Install as:
 ```
 pip install git+https://github.com/ustunb/reachml#egg=reachml
 ```
-The library relies on [IBM CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio). The free version of CPLEX is significantly slower than the commercial/academic one. To make it fast, you want to additionally install the closed-source version of Cplex in the virtual environment of the package.
+The library relies on [IBM CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio). The
+free version of CPLEX has a limit on the number of constraints compared to the
+commercial/academic version. For most useful use cases, you want to additionally install the
+full version of CPLEX in the virtual environment of the package:
+```
+python path/to/cplex/setup.py install
+```
+
+The path to the installer could be, e.g., `/opt/ibm/ILOG/CPLEX_Studio221/python/`.
