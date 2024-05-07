@@ -1,0 +1,776 @@
+---
+output:
+  pdf_document:  # see https://bookdown.org/yihui/rmarkdown/pdf-document.html for complete list
+    keep_tex: yes
+    fig_width: 7
+    fig_height: 5
+    fig_caption: true
+    toc: false
+    number_sections: false
+    extra_dependencies: # use this to load latex packages with options
+      grffile: ["space"] # e.g., this is the same as \usepackage[space]{grrfile}
+      flafter: []
+      booktabs: []
+      placeins: []
+      graphicx: []
+
+fontsize: 11pt
+geometry: margin=1in
+
+params:
+    venv_dir: '/Users/avnikothari/.virtualenvs/reticulate-python-env/bin/python3'
+    report_data: '/Users/avnikothari/Desktop/UCSD/Research/infeasible-recourse/results/german_action_set_1.results' # path to the pickle file for this template
+    report_python_dir: '/Users/avnikothari/Desktop/UCSD/Research/infeasible-recourse/' # directory containing python code
+    build_dir: '/Users/avnikothari/Desktop/UCSD/Research/infeasible-recourse/reports/' # directory where the template will be compiled
+---
+
+```{r setup-r, include = FALSE}
+# Use this chunk to default options for how to evaluate each code chunk in the template
+# For a complete list of options, see: https://yihui.org/knitr/options/#package_options
+knitr::opts_knit$set(
+  echo = FALSE, # set to TRUE to print code in the final report?
+  include = FALSE,
+  fig.path = '/Users/avnikothari/Desktop/UCSD/Research/infeasible-recourse/figure/' # pass the path for where to store PDFs
+  )
+
+
+# load R packages
+packages = c('reticulate', 'tidyverse', 'xtable', 'stringr', 'ggplot2', 'tinytex', "ggsci", "gridExtra")
+for (pkg in packages) {
+  library(pkg, character.only = TRUE, warn.conflicts = FALSE, quietly = TRUE, verbose = FALSE)
+}
+
+# load reticulate virtual environment
+# load python virtual environment for reticulate
+tryCatch({
+  use_condaenv(condaenv = params$venv_dir, required = FALSE)
+}, error = function(error_condition) {
+  use_virtualenv(virtualenv = params$venv_dir, required = TRUE)
+})
+
+```
+
+```{python setup-python, include = FALSE}
+# Use this chunk to set up your Python environment
+
+import os
+import sys
+print(os.getcwd())
+
+sys.path.append(r.params['report_python_dir'])
+
+from src.paths import *
+from src.ext import fileutils
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+
+```
+
+```{=latex}
+% Use this chunk to define Tex functions and run Tex commands
+% Whatever you put here will be placed after "\begin{document}" so you can't import packages
+% To import Tex packages just list them after `extra_dependencies`
+
+\newcommand{\cell}[2]{\begin{tabular}{#1}#2\end{tabular}}
+\pagenumbering{gobble}
+```
+
+
+
+```{python, include = FALSE}
+##### REPORT DATA AND CONSTANTS ########
+dropbox_path = "/Users/avnikothari/Dropbox/Apps/Overleaf/infeasible-recourse/"
+
+settings = {
+    'data_name': 'fico',
+    'random_seed': 2338,
+    'action_set_name': 'action_set_10',
+    'fold_id':'K05N01',
+    'description': ''
+    }
+
+#settings = fileutils.load(get_report_metadata_file())
+
+FOLD_ID = settings['fold_id']
+
+OUTCOME_PROB = 1
+
+data_name = settings['data_name']
+random_seed = settings['random_seed']
+action_set_name = settings['action_set_name']
+```
+
+```{python, include = FALSE}
+# load the report data from Python
+processed_data = fileutils.load(get_data_file(data_name, action_set_name))
+raw_data = fileutils.load(get_raw_data_file(data_name))
+action_set = fileutils.load(get_action_set_file(data_name, action_set_name))
+results = fileutils.load(get_audit_results_file(data_name, action_set_name))
+
+# models data
+raw_log_reg = fileutils.load(get_model_file(data_name, action_set_name, 'log_reg', is_raw = True))
+processed_log_reg =  fileutils.load(get_model_file(data_name, action_set_name, 'log_reg', is_raw = False))
+raw_rf_sklearn = fileutils.load(get_model_file(data_name, action_set_name, 'rf_sklearn', is_raw = True))
+processed_rf_sklearn = fileutils.load(get_model_file(data_name, action_set_name, 'rf_sklearn', is_raw = False))
+raw_xgb = fileutils.load(get_model_file(data_name, action_set_name, 'xgb', is_raw = True))
+processed_xgb = fileutils.load(get_model_file(data_name, action_set_name, 'xgb', is_raw = False))
+
+rs_df = pd.DataFrame(data=results["reachable_sets"])
+fp_df = pd.DataFrame(data=results["fixed_points"])
+```
+
+
+```{r, include=FALSE}
+######## HELPER R FUNCTIONS #############
+latex_bold <- function(x) {
+                        x <- paste0('{\\bfseries ', x, '}')
+                        x <- gsub(fixed = TRUE, pattern = "_", replacement = "\\_",x= x)
+                        return(x)
+                        }
+```
+
+```{python, include=FALSE}
+######## HELPER PYTHON FUNCTIONS #############
+def presenter_df(df):
+  df = df.applymap(str)
+  return df.replace("<NA>", pd.NA)
+
+def get_proto_strings(val, variable_types, is_action = False):
+  new_val = []
+  for (val, var_type) in zip(val, variable_types):
+      if pd.isna(val):
+          new_val.append(pd.NA)
+      elif var_type == bool and val == 1:
+          new_val.append("1")
+      elif (var_type == int or var_type == bool) and val == 0:
+        if is_action:
+          new_val.append(pd.NA)
+        else:
+          new_val.append("0")
+      elif var_type == bool and val == -1:
+          new_val.append("-1")
+      else:
+          new_val.append(val)
+  return new_val
+
+def as_prototype_dict_action(x_val, action_val, action_set_df):
+    A_df = action_set_df.sort_values(by=['actionable'])
+    features = action_set_df["name"].tolist()
+    variable_types = action_set_df["variable_type"].tolist()
+    new_x_val = np.add(x_val, action_val)
+    
+    action_val = [pd.NA if action_val[i] == x_val[i] else action_val[i] for i in range(len(action_val))]
+    new_action_val = get_proto_strings(action_val, variable_types, is_action=True)
+            
+    proto = {"id_for_x": pd.NA}
+    for (feat, new_val) in zip(features, new_action_val):
+        proto[feat] = new_val
+    
+    proto["y"] = pd.NA
+    predictions_for_proto(proto, new_x_val)
+    return proto
+  
+def predictions_for_proto(proto, val):
+  lr_pred = find_model.probs(processed_log_reg['model'], val, OUTCOME_PROB, scaler=processed_log_reg['scaler'])
+  rf_pred = find_model.predict(processed_rf_sklearn['model'], val)
+  xgb_pred = find_model.predict(processed_xgb['model'], val)
+    
+  
+  proto["LR_pred"] = lr_pred
+  proto["RF_sklearn_pred"] = rf_pred
+  proto["XGB_pred"] = xgb_pred
+  return proto
+  
+  
+def as_prototype_dict_x(id_for_x, datapoint, action_set_df):
+    A_df = action_set_df.sort_values(by=['actionable'])
+    features = action_set_df["name"].tolist()
+    variable_types = action_set_df["variable_type"].tolist()   
+    new_datapoint = get_proto_strings(datapoint, variable_types)
+          
+    proto = {"id_for_x": id_for_x}
+    for (feat, new_val) in zip(features, new_datapoint):
+        proto[feat] = new_val
+
+    y_true = processed_data.y[id_for_x]
+    proto["y"] = y_true
+    proto = predictions_for_proto(proto, datapoint)
+    return proto
+```
+
+
+
+```{python, include = FALSE}
+######## REPORT DATA TABLE #############
+info = {
+    'Data Name': data_name,
+    'Action Set Name': action_set_name,
+    'Fold Id': FOLD_ID,
+    'Report Creation Date': datetime.now().strftime("%b-%d-%Y"),
+    'n': processed_data.n,
+    'd': processed_data.d,
+    'y_name': processed_data.names.y,
+    'Predicted Outcome Prob': "+1" if OUTCOME_PROB == 1 else "-1",
+    'description': settings['description']
+}
+
+info_df = pd.DataFrame.from_records([info]).transpose()
+```
+
+```{r, include=FALSE}
+######## REPORT DATA TABLE #############
+xt = xtable(py$info_df, align = c("l", "r"))
+
+n_rows = nrow(py$info_df)
+xt_str = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = TRUE,
+                      include.colnames = FALSE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      hline.after=NULL,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.rownames.function = function(x) latex_bold(x),
+                      );
+```
+
+\begin{table}[h]
+\small
+`r xt_str`
+\end{table}
+
+```{python, include = FALSE}
+######## ACTION SET TABLE #############
+def get_var_type(var_type):
+    if var_type == bool:
+        return 'boolean'
+    elif var_type == int:
+        return 'integer'
+    elif var_type == float:
+        return 'float'
+    else:
+        return None
+  
+# changes variables in dataframe for presentation format    
+A_df = action_set.df
+A_df["var_type"] = A_df.apply(lambda row: get_var_type(row["variable_type"]), axis =1)
+A_df["actionable"] = A_df.apply(lambda row: 'T' if row["actionable"] == True else 'F', axis =1)
+A_df = A_df.rename(columns={"step_direction": "step_dir"})
+
+def get_reachable_group_type(row):
+  if row['additional_constraint'] == "reachable_group":
+    num_ones = np.count_nonzero(row['info']['point_set'][0] == 1)
+    if num_ones > 1:
+      return "thermometer_one_hot"
+    else:
+      return "thermometer_one_hot"
+  elif row['additional_constraint'] == "if_then":
+    return "if_then"
+  else:
+    return pd.NA
+    
+
+# Get additional constraints on features
+# Merge interactions and constraints
+constraints_join_df = pd.merge(action_set.interactions.info_df, action_set.interactions.feature_df, left_index=True, right_on= 'constraint_id')
+# Join constraints with Action Set
+features_and_constraints_df = pd.merge(A_df, constraints_join_df, how='left', left_index=True, right_on='feature_idx')
+
+# change column names for presentation format
+features_and_constraints_df = features_and_constraints_df.rename(columns={"type": "additional_constraint"})
+# features_and_constraints_df["additional_constraint"] = features_and_constraints_df.apply(lambda row: get_reachable_group_type(row), axis=1)
+A_display_df = features_and_constraints_df[["name", "lb", "ub", "var_type", "actionable", "step_dir"]]
+A_display_df = A_display_df.drop_duplicates(subset=['name'])
+
+
+
+# for presentation
+def update_step_dir(step_dir):
+  if step_dir > 0:
+    return "+"
+  elif step_dir < 0:
+    return "-"
+  else:
+    return step_dir
+
+A_display_df["step_dir"] = A_display_df.apply(lambda row: update_step_dir(row["step_dir"]), axis=1)
+A_display_df = A_display_df.reset_index(drop=True)
+A_display_df = A_display_df.rename(columns={"name": "Feature", "lb": "LB", "ub": "UB", "var_type": "Type", "actionable": "Actionable", "step_dir": "Monotonicity"})
+A_display_df = presenter_df(A_display_df)
+A_filepath = dropbox_path + "/results/givemecredit_complex_nD.tex"
+```
+
+
+```{r, include = FALSE}
+######## ACTION SET TABLE #############
+#llll
+xt = xtable(py$A_display_df, align = c("l", "l", "l", "l", "l", "l", "l"))
+
+n_rows = nrow(py$A_display_df)
+xt_str_act = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = FALSE,
+                      include.colnames = TRUE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.colnames.function = function(x) latex_bold(x),
+                      file=py$A_filepath
+                      );
+```
+\section{Action Set Description}
+\begin{table}[h]
+\fontsize{9pt}{9pt}\selectfont
+`r xt_str_act`
+\end{table}
+\FloatBarrier
+\clearpage
+
+```{python, include = FALSE}
+######## LOG REG MODEL TABLE ############
+def log_reg_stats(raw_data_log_reg, processed_data_log_reg):
+    train_raw = raw_data_log_reg["train"]
+    test_raw = raw_data_log_reg["test"]
+    
+    train_processed = processed_data_log_reg["train"]
+    test_processed = processed_data_log_reg["test"]
+    
+    return pd.DataFrame(data=[
+    ["raw", "log loss", train_raw["log_loss"],  test_raw["log_loss"]],
+    ["raw", "auc", train_raw["auc"],  test_raw["auc"]],
+    ["raw", "error", train_raw["error"],  test_raw["error"]], 
+    ["raw", "ece", train_raw["ece"], test_raw["ece"]],
+    ["processed", "log loss", train_processed["log_loss"],  test_processed["log_loss"]],
+    ["processed", "auc", train_processed["auc"],  test_processed["auc"]],
+    ["processed", "error", train_processed["error"],  test_processed["error"]], 
+    ["processed", "ece", train_processed["ece"], test_processed["ece"]],
+    ], columns=["Dataset Type", "Metric Name", "Value on Training Set", "Value on Test Set"])
+    
+log_reg_model_stats_df = presenter_df(log_reg_stats(raw_log_reg, processed_log_reg))
+```
+
+```{r, include = FALSE}
+######## LOG REG MODEL TABLE #############
+xt = xtable(py$log_reg_model_stats_df, align = c("l", "l", "l", "l", "l"))
+
+n_rows = nrow(py$log_reg_model_stats_df)
+xt_str_log_reg_model_stats = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = FALSE,
+                      include.colnames = TRUE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.colnames.function = function(x) latex_bold(x)
+                      );
+```
+\section{Logistic Regression Model}
+\begin{table}[h]
+\small
+`r xt_str_log_reg_model_stats`
+\end{table}
+
+\FloatBarrier
+
+
+```{python, include = FALSE}
+######## RANDOM FOREST SKLEARN MODEL TABLE #############
+def rf_stats(raw_data_rf, processed_data_rf):
+    train_raw = raw_data_rf["train"]
+    test_raw = raw_data_rf["test"]
+
+    train_processed = processed_data_rf["train"]
+    test_processed = processed_data_rf["test"]
+
+    return pd.DataFrame(data=[
+    ["raw", "auc", train_raw["auc"],  test_raw["auc"]],
+    ["raw", "error", train_raw["error"],  test_raw["error"]],
+    ["processed", "auc", train_processed["auc"],  test_processed["auc"]],
+    ["processed", "error", train_processed["error"],  test_processed["error"]],
+    ], columns=["Dataset Type", "Metric Name", "Value on Training Set", "Value on Test Set"])
+
+raw_rf_model_stats_df = presenter_df(rf_stats(raw_rf_sklearn, processed_rf_sklearn))
+```
+
+
+```{r, include=FALSE}
+######## RANDOM FOREST RAW MODEL DATA TABLE #############
+xt = xtable(py$raw_rf_model_stats_df, align = c("l", "l", "l", "l", "l"))
+
+n_rows = nrow(py$raw_rf_model_stats_df)
+xt_raw_rf_model_stats = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = FALSE,
+                      include.colnames = TRUE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.colnames.function = function(x) latex_bold(x)
+                      );
+```
+\section{Random Forest Sklearn Model}
+\begin{table}[h]
+\small
+`r xt_raw_rf_model_stats`
+\end{table}
+
+\FloatBarrier
+
+```{python, include = FALSE}
+######## XGBOOST MODEL TABLE #############
+def rf_stats(raw_data_rf, processed_data_rf):
+    train_raw = raw_data_rf["train"]
+    test_raw = raw_data_rf["test"]
+
+    train_processed = processed_data_rf["train"]
+    test_processed = processed_data_rf["test"]
+
+    return pd.DataFrame(data=[
+    ["raw", "auc", train_raw["auc"],  test_raw["auc"]],
+    ["raw", "error", train_raw["error"],  test_raw["error"]],
+    ["processed", "auc", train_processed["auc"],  test_processed["auc"]],
+    ["processed", "error", train_processed["error"],  test_processed["error"]],
+    ], columns=["Dataset Type", "Metric Name", "Value on Training Set", "Value on Test Set"])
+
+xgb_model_stats_df = presenter_df(rf_stats(raw_xgb, processed_xgb))
+```
+
+
+```{r, include=FALSE}
+######## XGBOOST MODEL DATA TABLE #############
+xt = xtable(py$xgb_model_stats_df, align = c("l", "l", "l", "l", "l"))
+
+n_rows = nrow(py$xgb_model_stats_df)
+xt_xgb_model_stats = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = FALSE,
+                      include.colnames = TRUE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.colnames.function = function(x) latex_bold(x)
+                      );
+```
+\section{XGBoost Model}
+\begin{table}[h]
+\small
+`r xt_xgb_model_stats`
+\end{table}
+
+\clearpage
+
+
+```{python, include = FALSE}
+######## FIXED POINT PROTOTYPES TABLE #############
+if len(fp_df) > 0:
+  data = [as_prototype_dict_x(id_for_x, pt, action_set.df) for (id_for_x, pt) in zip(fp_df["id_for_x"].values, fp_df["point"].values)]
+
+
+  fp_prototypes_df = presenter_df(pd.DataFrame(data=data))
+  fp_prototypes_df = fp_prototypes_df.transpose()
+else:
+  fp_prototypes_df = presenter_df(pd.DataFrame(data=[pd.NA]))
+```
+
+```{r, include = FALSE}
+######## FIXED POINT PROTOTYPES TABLE #############
+xt = xtable(py$fp_prototypes_df)
+
+n_rows = nrow(py$fp_prototypes_df)
+xt_str_fp_prototypes = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = TRUE,
+                      include.colnames = FALSE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      sanitize.rownames.function = function(x) latex_bold(x)
+                      )
+
+```
+
+\small \section{Fixed Points Prototypes}
+\begin{table}[h]
+\resizebox{14cm}{!}{
+`r xt_str_fp_prototypes`
+}
+\end{table}
+
+\clearpage
+
+```{python, include = FALSE}
+# ######## FIXED POINT PROTOTYPES FOR PAPER #############
+# if len(fp_df) > 0:
+#   df = fp_df[fp_df.id_for_x == 1081]
+#   data = [as_prototype_dict_x(id_for_x, pt, action_set.df) for (id_for_x, pt) in zip(df["id_for_x"].values, df["point"].values)]
+# 
+# 
+#   prototypes_df = presenter_df(pd.DataFrame(data=data))
+#   prototypes_df = prototypes_df.transpose()
+# else:
+#   prototypes_df = presenter_df(pd.DataFrame(data=[pd.NA]))
+# tex_path = dropbox_path + "results/fico/fp_prototype.tex"
+```
+
+```{r, include = FALSE}
+# ####### FIXED POINT PROTOTYPES TABLE #############
+# xt = xtable(py$prototypes_df)
+# 
+# n_rows = nrow(py$prototypes_df)
+# xt_str_prototype = print.xtable(xt,
+#                       type = "latex",
+#                       tabular.environment = "tabular",
+#                       booktabs = TRUE,
+#                       floating = FALSE,
+#                       include.rownames = TRUE,
+#                       include.colnames = FALSE,
+#                       NA.string="-",
+#                       comment=FALSE,
+#                       timestamp=FALSE,
+#                       add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+#                       sanitize.rownames.function = function(x) latex_bold(x),
+#                       )
+
+```
+
+```{python, include = FALSE}
+rs_df = pd.DataFrame(data=results["reachable_sets"])
+rs_df = rs_df.drop_duplicates(subset = "id_for_x")
+rs_df = rs_df[rs_df.num_reachable_pts > 0]
+
+rs_df["y_true"] = rs_df.apply(lambda row: processed_data.y[row["id_for_x"]], axis = 1)
+rs_df["lr_pred"] =  rs_df.apply(lambda row: find_model.predict(processed_log_reg["model"], row["point"], scaler = processed_log_reg["scaler"]), axis = 1)
+rs_df["rf_pred"] = rs_df.apply(lambda row: find_model.predict(processed_rf_sklearn["model"], row["point"]), axis = 1)
+rs_df["xgb_pred"] = rs_df.apply(lambda row: find_model.predict(processed_xgb["model"], row["point"]), axis = 1)
+```
+
+
+
+```{python, include = FALSE}
+def calc_recourse(x, reachable_set, model_type, hard_cap):
+  if len(reachable_set) == 0:
+    if model_type == "log_reg":
+      pred = find_model.predict(processed_log_reg["model"], np.array(x), scaler = processed_log_reg["scaler"])
+    elif model_type == "rf_sklearn":
+      pred = find_model.predict(processed_rf_sklearn["model"], np.array(x))
+    elif model_type == "xgb":
+      pred = find_model.predict(processed_xgb["model"],np.array(x))
+    return "infeasible" if pred == "-" else "feasible"
+    
+  points = np.concatenate((np.array([x]), np.array(reachable_set)), axis = 0)
+  if model_type == "log_reg":
+    predictions = find_model.predict_all(processed_log_reg["model"], points, scaler = processed_log_reg["scaler"])
+  elif model_type == "rf_sklearn":
+    predictions = find_model.predict_all(processed_rf_sklearn["model"], points)
+  elif model_type == "xgb":
+    predictions = find_model.predict_all(processed_xgb["model"], points)
+
+  are_all_negs = lambda preds: set(preds) == set(["-"])
+  
+  if len(reachable_set) == hard_cap:
+    return "abstain" if are_all_negs(predictions) else "feasible"
+
+  return "infeasible" if are_all_negs(predictions) else "feasible"
+  
+  
+
+rs_df["lr_recourse"] = rs_df.apply(lambda row: calc_recourse(row["point"], row["reachable_set"], "log_reg", results["hard_cap"]), axis = 1)
+rs_df["rf_recourse"] = rs_df.apply(lambda row: calc_recourse(row["point"], row["reachable_set"], "rf_sklearn", results["hard_cap"]), axis = 1)
+rs_df["xgb_recourse"] = rs_df.apply(lambda row: calc_recourse(row["point"], row["reachable_set"], "xgb", results["hard_cap"]), axis = 1)
+
+num_no_recourse_lr = sum(rs_df.lr_recourse == "infeasible")
+print(num_no_recourse_lr)
+num_no_recourse_rf = sum(rs_df.rf_recourse == "infeasible")
+print(num_no_recourse_rf)
+num_no_recourse_xgb = sum(rs_df.xgb_recourse == "infeasible")
+print(num_no_recourse_xgb)
+
+log_reg_no_recourse = set(rs_df[rs_df.lr_recourse == "infeasible"].id_for_x.values.tolist())
+rf_no_recourse = set(rs_df[rs_df.rf_recourse == "infeasible"].id_for_x.values.tolist())
+xgb_no_recourse = set(rs_df[rs_df.xgb_recourse == "infeasible"].id_for_x.values.tolist())
+
+num_lr_no_recourse = len(log_reg_no_recourse)
+num_rf_no_recourse = len(rf_no_recourse)
+num_xgb_no_recourse = len(xgb_no_recourse)
+
+num_fixed_regions = len(rs_df)
+
+
+all_classifiers_no_recourse = len(log_reg_no_recourse.intersection(xgb_no_recourse))
+print(all_classifiers_no_recourse)
+
+at_least_one_classifiers_no_recourse = len(log_reg_no_recourse.union(rf_no_recourse).union(xgb_no_recourse))
+print(at_least_one_classifiers_no_recourse)
+```
+Number of fixed regions: `r py$num_fixed_regions`
+\newline
+Number of fixed regions with no recourse for LR: `r py$num_lr_no_recourse`
+\newline
+Number of fixed regions with no recourse for RF: `r py$num_rf_no_recourse`
+\newline
+Number of fixed regions with no recourse for XGB: `r py$num_xgb_no_recourse`
+\newline
+Number of fixed regions with no recourse under 1 classifier: `r py$at_least_one_classifiers_no_recourse`
+\newline
+Number of fixed regions with no recourse under all classifiers: `r py$all_classifiers_no_recourse`
+
+
+```{python, include = FALSE}
+# data for graph
+# def set_barplot_id(df):
+#     unique_x_vals = pd.unique(df['id_for_x']).tolist()
+#     new_ids = list(range(0, len(unique_x_vals)))
+#     mapping = dict(zip(unique_x_vals, new_ids))
+#     df["region_id"] = df.apply(lambda row: mapping[row["id_for_x"]], axis=1)
+#     return df
+#   
+# def get_y_true(row):
+#   y_true = processed_data.y[row["id_for_x"]]
+#   return "-" if y_true == -1.0 else "+"
+# 
+# rs_df = pd.DataFrame(data=results["reachable_sets"])
+# rs_df = rs_df.drop_duplicates(subset = "id_for_x")
+# 
+# rs_df["lr_pred"] =  rs_df.apply(lambda row: find_model.predict(processed_log_reg["model"], row["point"], scaler = processed_log_reg["scaler"]), axis = 1)
+# rs_df["xgb_pred"] = rs_df.apply(lambda row: find_model.predict(processed_xgb["model"], row["point"]), axis = 1)
+# 
+# rs_df["lr_recourse"] = rs_df.apply(lambda row: calc_recourse(row["point"], row["reachable_set"], "log_reg", results["hard_cap"]), axis = 1)
+# rs_df["xgb_recourse"] = rs_df.apply(lambda row: calc_recourse(row["point"], row["reachable_set"], "xgb", results["hard_cap"]), axis = 1)
+
+```
+
+```{python, include = FALSE}
+# rs_df = rs_df.sort_values(by="num_reachable_pts")
+# rs_barplot_df = set_barplot_id(rs_df)
+# rs_barplot_df['label_type'] = rs_barplot_df.apply(lambda row: get_y_true(row), axis = 1 )
+# rs_barplot_df['region_size'] = rs_barplot_df.apply(lambda row: row.num_reachable_pts + 1, axis = 1)
+# 
+# lr_barplot_df = rs_barplot_df.copy()
+# lr_barplot_df['model_type'] = 'lr'
+# lr_barplot_df = lr_barplot_df.rename(columns={"lr_pred": "prediction_type"})
+# lr_barplot_df = lr_barplot_df.rename(columns={"lr_recourse": "recourse"})
+# lr_barplot_df['correct'] = lr_barplot_df.apply(lambda row: row["label_type"] == row["prediction_type"], axis = 1 )
+# lr_barplot_df['abstain'] = lr_barplot_df.apply(lambda row: row["recourse"] == "abstain", axis = 1 )
+# lr_barplot_df = lr_barplot_df[["label_type", "region_id", "model_type",  "region_size", "prediction_type", "recourse", "correct", "abstain"]]
+# 
+# xgb_barplot_df = rs_barplot_df.copy()
+# xgb_barplot_df['model_type'] = 'xgb'
+# xgb_barplot_df = xgb_barplot_df.rename(columns={"xgb_pred": "prediction_type"})
+# xgb_barplot_df = xgb_barplot_df.rename(columns={"xgb_recourse": "recourse"})
+# xgb_barplot_df['correct'] = xgb_barplot_df.apply(lambda row: row["label_type"] == row["prediction_type"], axis = 1 )
+# xgb_barplot_df['abstain'] = xgb_barplot_df.apply(lambda row: row["recourse"] == "abstain", axis = 1 )
+# xgb_barplot_df = xgb_barplot_df[["label_type", "region_id", "model_type", "region_size", "prediction_type", "recourse", "correct", "abstain"]]
+# 
+# df = pd.concat([lr_barplot_df,xgb_barplot_df ])
+```
+
+```{python, include = FALSE}
+#df.to_csv("/Users/avnikothari/Desktop/UCSD/Research/infeasible-recourse/graphs/reachable_set_barplot.csv", index = False)
+
+```
+
+
+
+```{python, include = FALSE}
+# # fixed region with no recourse under log reg for fico
+# example_df = rs_df[rs_df["id_for_x"] == 614]
+# pts = np.concatenate(([example_df.point.values[0]],example_df.reachable_set.tolist()[0]), axis = 0)
+# 
+# log_reg_preds = find_model.predict_all(processed_log_reg["model"], pts, scaler = processed_log_reg["scaler"])
+# example_df['are_all_negs_lr'] = are_all_negs(log_reg_preds)
+# 
+# rf_preds = find_model.predict_all(processed_rf_sklearn["model"], pts)
+# example_df['are_all_negs_rf'] = are_all_negs(rf_preds)
+# 
+# xgb_preds = find_model.predict_all(processed_xgb["model"], pts)
+# example_df['are_all_negs_xgb'] = are_all_negs(xgb_preds)
+# 
+# # They have 10 reachable points all are negatively classified
+# # y_true = -1.0
+# 
+# x_val = example_df.point.values[0]
+# cols = action_set.df['name'].tolist()
+# 
+# for val, col in zip(x_val,cols):
+#   print(f"{col} : {val}")
+# 
+# print("-----------")
+# 
+# rs = example_df.action_values.tolist()[0]
+# for pt in rs:
+#   for val, col in zip(pt, cols):
+#     if val != 0:
+#       print(f"{col} : {val}")
+# print("-------------")
+```
+
+```{python, include = FALSE}
+# # create dataframe with no recourse fixed region of a region with 3 action values
+# region = rs_df[rs_df["id_for_x"] == 2295]
+# 
+# def fixed_protos(id_for_x, x_val, action_values):
+#   x_proto = as_prototype_dict_x(id_for_x, x_val, action_set.df)
+#   acts_protos = [as_prototype_dict_action(x_val, act, action_set.df) for act in action_values]
+#   data = [x_proto] + acts_protos
+#   columns = ["x_val"] + [f"action_{i+1}" for i in range (0, len(action_values))]
+#   df = pd.DataFrame(data=data).transpose()
+#   return df.set_axis(columns, axis=1)
+# 
+# 
+# 
+# fn_fixed_protos_df = fixed_protos(region["id_for_x"].values[0], region["point"].values[0], region["action_values"].values[0])
+# fn_fixed_protos_df = presenter_df(fn_fixed_protos_df)
+# tex_path = dropbox_path + "results/fico/fixed_region_prototype.tex"
+```
+
+
+```{r, include = FALSE}
+####### FIXED POINT PROTOTYPES TABLE #############
+# xt = xtable(py$fn_fixed_protos_df)
+# 
+# n_rows = nrow(py$fn_fixed_protos_df)
+# xt_str_prototype = print.xtable(xt,
+#                       type = "latex",
+#                       tabular.environment = "tabular",
+#                       booktabs = TRUE,
+#                       floating = FALSE,
+#                       include.rownames = TRUE,
+#                       include.colnames = FALSE,
+#                       NA.string="-",
+#                       comment=FALSE,
+#                       timestamp=FALSE,
+#                       add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+#                       sanitize.rownames.function = function(x) latex_bold(x),
+#                       file=py$tex_path
+#                       )
+
+```
+
+
+

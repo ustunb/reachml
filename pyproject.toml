@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "reachml"
+version = "0.1.0"
+description = "Recourse verification with reachable sets"
+authors = ["Berk Ustun <berk@ucsd.edu>",
+           "Bogdan Kulynych <bogdan@kulyny.ch>",
+           "Avni Kothari <akothari@ucsd.edu>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "^1.26.4"
+pandas = "^2.2.2"
+cplex = "^22.1.1.2"
+tqdm = "^4.66.4"
+prettytable = "^3.10.0"
+h5py = "^3.11.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+
+[tool.poetry.group.iclr2024.dependencies]
+pytest = "^8.2.0"
+jupyter = "^1.0.0"
+seaborn = "^0.13.2"
+matplotlib = "^3.8.4"
+xgboost = "^2.0.3"
+scikit-learn = "^1.4.2"
+imblearn = "^0.0"
+dill = "^0.3.8"
+ipdb = "^0.13.13"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

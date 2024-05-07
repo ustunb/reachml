@@ -1,0 +1,241 @@
+---
+# This block contains YAML metadata for the template.
+
+# `output` specifies the type of document to output + options for each type
+output:
+  pdf_document:  # see https://bookdown.org/yihui/rmarkdown/pdf-document.html for complete list
+    keep_tex: yes
+    fig_width: 7
+    fig_height: 5
+    fig_caption: true
+    toc: false
+    number_sections: false
+    extra_dependencies: # use this to load latex packages with options
+      grffile: ["space"] # e.g., this is the same as \usepackage[space]{grrfile}
+      flafter: []
+      booktabs: []
+      
+# these top-level parameters set options that don't depend on the document type
+fontsize: 11pt
+geometry: margin=1in
+
+# `params` specify parameters for this specific template (see: https://bookdown.org/yihui/rmarkdown/params-declare.html)
+# DO NOT DELETE THESE -- you'll use them for every report
+# RStudio lets you set default values all parameters in an RMarkdown template using
+# Knit > Knit with Parameters command in the Editor. Use this when developing your template.
+params:
+    venv_dir: '/Users/berk/.virtualenvs/py39arm/bin/python'
+    report_data: '/Users/berk/Dropbox (Harvard University)/repos/recourse-feasibility/results/iris.results' # path to the pickle file for this template
+    report_python_dir: '/Users/berk/Dropbox (Harvard University)/repos/recourse-feasibility/' # directory containing python code
+    build_dir: '/Users/berk/Dropbox (Harvard University)/repos/recourse-feasibility/reports/' # directory where the template will be compiled
+---
+
+```{r setup-r, include = FALSE}
+
+# Use this chunk to default options for how to evaluate each code chunk in the template
+# For a complete list of options, see: https://yihui.org/knitr/options/#package_options
+knitr::opts_knit$set(
+  echo = FALSE, # set to TRUE to print code in the final report?
+  fig.path = 'figure/' # pass the path for where to store PDFs
+  )
+# Setting "echo = FALSE" here means that the template will not show the code in each chunk (by default)
+# We can override this behavior for a specific chunk by adding "echo = TRUE" to the top of the chunk
+
+# load R packages
+packages = c('reticulate', 'tidyverse', 'xtable', 'stringr')
+for (pkg in packages) {
+  library(pkg, character.only = TRUE, warn.conflicts = FALSE, quietly = TRUE, verbose = FALSE)
+}
+
+# load reticulate virtual environment
+# load python virtual environment for reticulate
+tryCatch({
+  use_condaenv(condaenv = params$venv_dir, required = TRUE)
+}, error = function(error_condition) {
+  use_virtualenv(virtualenv = params$venv_dir, required = TRUE)
+})
+
+```
+
+```{python setup-python, include = FALSE}
+# Use this chunk to set up your Python environment
+
+import os
+import sys
+print(os.getcwd())
+
+sys.path.append(r.params['report_python_dir'])
+
+import dill
+import numpy as np
+import itertools
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+from datetime import datetime
+
+```
+
+```{=latex}
+% Use this chunk to define Tex functions and run Tex commands
+% Whatever you put here will be placed after "\begin{document}" so you can't import packages
+% To import Tex packages just list them after `extra_dependencies`
+
+\newcommand{\cell}[2]{\begin{tabular}{#1}#2\end{tabular}}
+\pagenumbering{gobble}
+```
+
+```{python, include = FALSE}
+
+# load the report data from Python
+try:
+
+  with open(r.params['report_data'], 'rb') as infile:
+      results = dill.load(infile)
+
+except ValueError:
+  
+  import pickle5 as pickle
+  with open(r.params['report_data'], 'rb') as infile:
+      results = pickle.load(infile)
+
+```
+
+This report is produced using the template `pyrmd/templates/demo_report.Rmd`. After running `usage.py`, open `demo_report.Rmd` document in RStudio to see how to write a template. The template file includes lots of content that is not shown in the PDF.
+
+# Quick Introduction to RMarkdown
+
+The template is composed of text and code chunks.
+
+## Code Chunk Syntax
+
+Code chunks are used to execute code in the template. R Markdown lets you write code chunks in R, Python, SQL, Latex. For example, we can use a chunk like this one:
+
+```{python}
+with open(r.params['report_data'], 'rb') as infile:
+    results = dill.load(infile)
+```
+
+Code chunks can access variables from previous chunks. For example, the next Python code chunk can access `results`:
+
+```{python}
+assert(isinstance(results, dict))
+```
+
+Using `reticulate`, we can also access Python variables in an R code chunk via the `py` object.
+```{r}
+
+# access `results` as a list in R
+py$results
+
+# set foo to py$results$data_name
+foo <- py$results$data_name
+
+# set df to py$results$df
+df <- py$results$df
+```
+
+Reticulate uses a straightforward mapping between different data types in Python and R:
+
+- Python dict $\leftrightarrow$  R list
+- Pandas DataFrame $\leftrightarrow$ R data.frame
+
+
+## Text Syntax
+
+Text is everything in a template that is not included in a code chunk. This text is parsed as `R Markdown syntax`, which is basic Markdown with some Latex mixed in. For a quick overview, check out [this quick introduction](https://www.stat.cmu.edu/~cshalizi/rmarkdown/). Some cool things you can do:
+
+- Inline math like $f(x) = 10$
+- Inline R code like `r foo` or `r py$results$data_name`.
+- Basic latex commands. For example, we'll use \\clearpage to start a page break below.
+
+\clearpage
+# Useful Code Chunks
+
+### Code Chunks used to Setup Environment
+
+If you open the template file using RStudio or a text editor, you will find several hidden code chunks placed before the Intro section. These code chunks are used to setup your coding environment in R, Python, and Latex. Include them at the top of every report template you create.
+
+### Code Chunks to Create a Latex Tables with `xtable`
+
+The [xtable package](https://cran.r-project.org/web/packages/xtable/vignettes/xtableGallery.pdf) in R lets you create Latex tables from data structures in Python and R.
+
+Below, I show how we can use this to create a simple summary table from a Python dictionary. You should include tables like these at the top of each report to show "metadata" like, experimental parameters, the name of the results file, when the experiment was run etc.
+
+```{python create-table-1}
+
+info = {
+    'Data Name': results['data_name'],
+    'Results File': Path(r.params['report_data']).stem,
+    'Report Creation Date': datetime.now().strftime("%b-%d-%Y"),
+    'Rows in df': results['df'].shape[0],
+    'Columns in df': results['df'].shape[1],
+}
+
+info_df = pd.DataFrame.from_records([info]).transpose()
+```
+
+```{r create-table-2, echo=TRUE, include=FALSE}
+
+# create an xtable from a data.frame
+xt = xtable(py$info_df, align = c("l", "r"))
+
+# print the xtable as a string
+n_rows = nrow(py$info_df)
+xt_str = print.xtable(xt,
+                      type = "latex", 
+                      tabular.environment = "tabular",
+                      booktabs = TRUE,
+                      floating = FALSE,
+                      include.rownames = TRUE,
+                      include.colnames = FALSE,
+                      NA.string="-",
+                      comment=FALSE,
+                      timestamp=FALSE,
+                      hline.after=NULL,
+                      add.to.row = list(pos=as.list(-1:n_rows), command=c('\\toprule ','',rep('\\midrule ',n_rows-1),'\\bottomrule\n')),
+                      #
+                      # use the 'sanitize' functions to process the raw data in the table
+                      # use sanitize.text.function to strip special characters from latex
+                      # use sanitize.rownames and sanitize.colnames to format rows and column header
+                      sanitize.text.function = function(x){sanitize(x, type = "latex")},
+                      sanitize.rownames.function = function(x){paste0('{\\bfseries ', x, '}')},
+                      sanitize.colnames.function = function(x){paste0('{\\bfseries ', x, '}')}
+                      );
+```
+\begin{table}[h]
+\small
+`r xt_str`
+\end{table}
+
+\clearpage
+### Create Plot in Python using Matplotlib
+
+```{python plt-example, fig.path = 'figure/'}
+plt.plot([0, 2, 1, 4])
+plt.show()
+```
+
+\clearpage
+### Create Plot with `dplyr`
+
+```{R ggplot-example, fig.path = 'figure/'}
+
+data("midwest", package = "ggplot2");
+midwest <- read.csv("http://goo.gl/G1K41K");
+
+# create a scatterplot
+gg <- ggplot(midwest, aes(x=area, y=poptotal)) +
+  geom_point(aes(col=state, size=popdensity)) +
+  geom_smooth(method="loess", se=F) +
+  xlim(c(0, 0.1)) +
+  ylim(c(0, 500000)) +
+  labs(subtitle="Area Vs Population",
+       y="Population",
+       x="Area",
+       title="Scatterplot",
+       caption = "Source: midwest")
+
+plot(gg)
+```
+
