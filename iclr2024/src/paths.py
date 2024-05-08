@@ -5,23 +5,25 @@ This file defines paths for key directories and files. Contents include:
 """
 
 from pathlib import Path
+import os
 
 # Directories
 
 # path to the GitHub repository
-repo_dir = Path(__file__).resolve().parent
+paper_dir = Path(os.path.join(os.getcwd(), 'iclr2024')).resolve()
+repo_dir = Path(os.getcwd()).resolve()
 
 # directory where we store datasets
-data_dir = repo_dir / "data/"
+data_dir = paper_dir / "data/"
 
 # path to the Python package
 tests_dir = repo_dir / "tests/"
 
 # directory where we store results
-results_dir = repo_dir / "results/"
+results_dir = paper_dir / "results/"
 
 # directory of reporting package
-reporting_dir = repo_dir / "reporting/"
+reporting_dir = paper_dir / "reporting/"
 
 # directory where we store templates
 templates_dir = reporting_dir / "templates/"

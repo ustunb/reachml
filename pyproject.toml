@@ -39,6 +39,8 @@ xgboost = "^2.0.3"
 scikit-learn = "^1.4.2"
 imblearn = "^0.0"
 dill = "^0.3.8"
+ipdb = "^0.13.13"
+rich = "^13.7.1"
 
 [build-system]
 requires = ["poetry-core"]

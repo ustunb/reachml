@@ -1,12 +1,12 @@
 import os
 import sys
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 import pandas as pd
 import numpy as np
 import itertools
-from iclr2024.src.paths import *
+from src.paths import *
 from src import fileutils
 from src.data import BinaryClassificationDataset
 from reachml import ActionSet, ReachableSetDatabase
