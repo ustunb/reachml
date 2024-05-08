@@ -122,7 +122,7 @@ set has changed.
 
 You can now retrieve the generated reachable sets from the database by calling `db[x]` with
 a given initial feature vector `x`:
-```
+```python
 # Get the reachable set of the first example.
 reachable_set = db[data.iloc[0]]
 print(pd.DataFrame(reachable_set.X, columns=data.columns))
