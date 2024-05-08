@@ -6,7 +6,12 @@ from prettytable import PrettyTable
 from .action_element import ActionElement
 from .constraints.abstract import ActionabilityConstraint
 from .constraints.directional_linkage import DirectionalLinkage
-from .utils import check_variable_names, expand_values, check_feature_matrix
+from .utils import (
+    check_variable_names,
+    ensure_matrix,
+    expand_values,
+    check_feature_matrix,
+)
 
 
 class ActionSet(object):
@@ -21,12 +26,7 @@ class ActionSet(object):
         :param names: list of strings containing variable names.
                       names is only required if X is a numpy matrix
         """
-        assert isinstance(
-            X, (pd.DataFrame, np.ndarray)
-        ), "`X` must be pandas.DataFrame or numpy.ndarray"
-        if isinstance(X, pd.DataFrame):
-            names = X.columns.tolist()
-            X = X.values
+        X, names = ensure_matrix(X, names=names)
 
         # validate X/Names
         assert check_variable_names(names)
@@ -81,6 +81,7 @@ class ActionSet(object):
         :return: True/False if X meets all the bounds and constraints in this action set (default)
                  if return_df = True, then it will return a DataFrame showing which points in X are violated
         """
+        X, _ = ensure_matrix(X)
         assert check_feature_matrix(X, d=len(self))
         # todo: add fast return
         # fast_return = warn == False and return_df == False
@@ -528,8 +529,6 @@ class _ActionSlice(object):
 
     def __repr__(self):
         return str(self)
-
-
 
 
 def tabulate_actions(action_set):

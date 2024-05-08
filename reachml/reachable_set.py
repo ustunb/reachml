@@ -142,7 +142,7 @@ class ReachableSet(object):
         feature_mask=None,
         max_score=None,
         weigh_changes=False,
-        invert=False #,ignore_downstream_effects = False,
+        invert=False,  # ,ignore_downstream_effects = False,
     ):
         """
         computes reachability scores across features.

@@ -482,7 +482,7 @@ test-no-images = ["pytest", "pytest-cov", "pytest-xdist", "wurlitzer"]
 name = "cplex"
 version = "22.1.1.2"
 description = "A Python interface to the CPLEX Callable Library, Community Edition."
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "cplex-22.1.1.2-cp310-cp310-macosx_10_6_x86_64.whl", hash = "sha256:d74a91f6e9c6f4ad4c7c69f7ab937ea9e91178a556f6f105c87eef9e434ea42e"},
@@ -3074,7 +3074,10 @@ plotting = ["graphviz", "matplotlib"]
 pyspark = ["cloudpickle", "pyspark", "scikit-learn"]
 scikit-learn = ["scikit-learn"]
 
+[extras]
+cplex = ["cplex"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "4d65431cc80c80966f2cba07fcf454961d94c31817fd04119da9712cdb3882ac"
+content-hash = "7cddf661776fa43b31b3119cceea22660d354a0c3daa9b14d3325e0e12b8c40b"

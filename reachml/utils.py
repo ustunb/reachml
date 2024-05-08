@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from itertools import chain
 from os.path import commonprefix
 
@@ -9,6 +10,18 @@ def has_feature_vector_discrete(X, x):
 
 def has_feature_vector_float(X, x, atol):
     return np.isclose(X, x, atol=atol).all(axis=1).any()
+
+
+def ensure_matrix(X, names=None):
+    if not isinstance(X, (pd.DataFrame, np.ndarray)):
+        raise TypeError("`X` must be pandas.DataFrame or numpy.ndarray")
+    if isinstance(X, pd.DataFrame):
+        if names is not None:
+            raise ValueError("Should not supply names when X is a dataframe.")
+        names = X.columns.tolist()
+        X = X.values
+
+    return X, names
 
 
 def expand_values(value, m):

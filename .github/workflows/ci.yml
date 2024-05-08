@@ -39,7 +39,7 @@ jobs:
         with:
           path: .venv
           key: pydeps-${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}
-      - run: poetry install --no-interaction --with dev
+      - run: poetry install --no-interaction --with dev -E cplex
         name: Install package
       - run: poetry run pytest
         name: Run tests

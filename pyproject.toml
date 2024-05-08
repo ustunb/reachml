@@ -12,13 +12,23 @@ readme = "README.md"
 python = "^3.10"
 numpy = "^1.26.4"
 pandas = "^2.2.2"
-cplex = "^22.1.1.2"
 tqdm = "^4.66.4"
 prettytable = "^3.10.0"
 h5py = "^3.11.0"
+cplex = { version = "^22.1.1.2", optional = true }
+
+[tool.poetry.extras]
+cplex = ["cplex"]
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
+ipdb = "^0.13.13"
 pytest = "^8.2.0"
+
+[tool.poetry.group.iclr2024]
+optional = true
 
 [tool.poetry.group.iclr2024.dependencies]
 pytest = "^8.2.0"
@@ -29,7 +39,6 @@ xgboost = "^2.0.3"
 scikit-learn = "^1.4.2"
 imblearn = "^0.0"
 dill = "^0.3.8"
-ipdb = "^0.13.13"
 
 [build-system]
 requires = ["poetry-core"]
