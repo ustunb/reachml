@@ -25,7 +25,7 @@ where the path to the installer could be, e.g., `/opt/ibm/ILOG/CPLEX_Studio221/p
 If you want to use simple applications and are not using the Mac M1 architecture, you can install
 the version of the library packaged with free CPLEX right away:
 ```
-pip install git+https://github.com/ustunb/reachml#egg=reachml[cplex]
+pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ```
 
 ## Quickstart
