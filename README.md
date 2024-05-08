@@ -107,7 +107,7 @@ action_set["years_since_last_default"].ub = 100
 
 ### Generating Reachable Sets
 For a given initial feature vector, a reachable set is the set of all other feature vectors that
-are achievable through actions applied to the initial feature vectore. To generate a reachable set, use a
+are achievable through actions applied to the initial feature vector. To generate a reachable set, use a
 `ReachableSetDatabase`:
 
 ```python
