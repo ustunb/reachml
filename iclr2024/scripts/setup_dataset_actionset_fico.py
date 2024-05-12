@@ -54,7 +54,7 @@ def process_dataset(raw_df):
 
     # filter out rows without credit history
     # -9 No Bureau Record or No Investigation - i.e, no credit history/score information is available.
-    no_bureau_record = raw_df.eq(-9).any(1)
+    no_bureau_record = raw_df.eq(-9).any(axis=1)
     raw_df = raw_df[~no_bureau_record]
 
     # filter out rows without usable/valid trades/inquiries
@@ -68,7 +68,7 @@ def process_dataset(raw_df):
     # print(np.mean(no_usable_valid_trades))
     # raw_df = raw_df[~no_usable_valid_trades]
 
-    no_usable_trades = raw_df.eq(-8).any(1)
+    no_usable_trades = raw_df.eq(-8).any(axis=1)
     raw_df = raw_df[~no_usable_trades]
 
     # -7 Condition not Met (e.g. No Inquiries, No Delinquencies)

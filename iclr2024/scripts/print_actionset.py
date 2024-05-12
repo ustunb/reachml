@@ -3,7 +3,7 @@ import os
 import psutil
 import argparse
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 from src.paths import *
 from src import fileutils
 from pathlib import Path

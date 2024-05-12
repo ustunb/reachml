@@ -83,7 +83,7 @@ def train_logreg(data, seed=None, label_encoding=None, rescale=True, rebalance=N
     pool = RandomizedSearchCV(
         estimator=LogisticRegression(random_state=seed),
         param_distributions={
-            "penalty": ["none"],
+            "penalty": [None],
             "solver": ["saga"],
             "max_iter": [3_000_000],
         },
@@ -118,7 +118,7 @@ def train_logreg_vanilla(
         seed=seed,
     )
     clf = LogisticRegression(
-        random_state=seed, penalty="none", solver="saga", max_iter=3_000_000, verbose=0
+        random_state=seed, penalty=None, solver="saga", max_iter=3_000_000, verbose=0
     )
     clf.fit(processed["X_train"], processed["y_train"])
     out = {

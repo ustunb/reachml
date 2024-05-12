@@ -2,7 +2,7 @@ import os
 import sys
 import itertools
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 import pandas as pd
 from iclr2024.src.paths import *

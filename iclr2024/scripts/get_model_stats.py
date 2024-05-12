@@ -4,7 +4,7 @@ import sys
 import psutil
 import rich
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 import numpy as np
 import pandas as pd

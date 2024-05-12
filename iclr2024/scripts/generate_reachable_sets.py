@@ -3,7 +3,7 @@ import os
 import psutil
 import argparse
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 settings = {
     "data_name": "german",

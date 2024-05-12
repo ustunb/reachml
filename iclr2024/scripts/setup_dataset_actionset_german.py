@@ -1,7 +1,7 @@
 # fmt: off
 import os
 import sys
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 import numpy as np
 import pandas as pd

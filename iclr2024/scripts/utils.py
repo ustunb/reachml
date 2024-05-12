@@ -41,11 +41,11 @@ def check_processing_loss(
         fold_num_test=fold_num_test,
     )
     if model_type == "logreg":
-        from reachml.ext.training import train_logreg_vanilla as train_model
+        from src.training import train_logreg_vanilla as train_model
     elif model_type == "xgb":
-        from reachml.ext.training import train_xgb as train_model
+        from src.training import train_xgb as train_model
     elif model_type == "rf":
-        from reachml.ext.training import train_rf as train_model
+        from src.training import train_rf as train_model
     elif model_type == "dnn":
         raise NotImplementedError()
     out = {
