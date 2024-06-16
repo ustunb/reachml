@@ -30,19 +30,19 @@ def main():
 
     pipeline = []
     if "setup" in args.stages:
-        pipeline.append(f"python iclr2024/scripts/setup_dataset_actionset_{args.data_name}.py")
-        #todo: pipeline.append(f"python scripts/setup_dataset_actionset_{args.data_name}.py")
+        pipeline.append(f"python scripts/setup_dataset_actionset_{args.data_name}.py")
+        # todo: pipeline.append(f"python scripts/setup_dataset_actionset_{args.data_name}.py")
 
     if "db" in args.stages:
         if args.action_set_name == GEN_DB_ACTION_SET:
             pipeline.append(
-                f"python iclr2024/scripts/generate_reachable_sets.py --data_name={args.data_name} --action_set_name={args.action_set_name} {'--overwrite' if args.overwrite else ''}"
+                f"python scripts/generate_reachable_sets.py --data_name={args.data_name} --action_set_name={args.action_set_name} {'--overwrite' if args.overwrite else ''}"
             )
 
     if "train" in args.stages:
         for model in args.models:
             pipeline.append(
-                f"python iclr2024/scripts/train_models.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model}"
+                f"python scripts/train_models.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model}"
             )
 
     if "baselines" in args.stages:
@@ -53,7 +53,7 @@ def main():
                     continue
                 else:
                     pipeline.append(
-                        f"python iclr2024/scripts/run_{method}.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model}"
+                        f"python scripts/run_{method}.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model}"
                     )
 
     if "audit" in args.stages:
@@ -62,7 +62,7 @@ def main():
                 continue
             else:
                 pipeline.append(
-                    f"python iclr2024/scripts/run_audit.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model} --method_name={method}",
+                    f"python scripts/run_audit.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model} --method_name={method}",
                 )
 
     if "stats" in args.stages:
@@ -71,7 +71,7 @@ def main():
                 continue
             else:
                 pipeline.append(
-                    f"python iclr2024/scripts/compute_stats.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model} --method_name={method}",
+                    f"python scripts/compute_stats.py --data_name={args.data_name} --action_set_name={args.action_set_name} --model_type={model} --method_name={method}",
                 )
 
     # Run each command in the list

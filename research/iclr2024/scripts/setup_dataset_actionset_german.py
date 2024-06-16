@@ -1,7 +1,6 @@
 # fmt: off
 import os
 import sys
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 
 
-from iclr2024.src.paths import *
+from src.paths import *
 from src import fileutils
 from src.data import BinaryClassificationDataset
 from reachml import ActionSet, ReachableSetDatabase

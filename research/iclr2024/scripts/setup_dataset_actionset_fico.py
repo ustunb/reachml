@@ -1,8 +1,6 @@
 import os
 import sys
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
-
 import pandas as pd
 import numpy as np
 import itertools

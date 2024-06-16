@@ -3,8 +3,6 @@ import os
 import sys
 import psutil
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
-
 import pandas as pd
 import argparse
 

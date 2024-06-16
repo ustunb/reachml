@@ -2,10 +2,8 @@ import os
 import sys
 import itertools
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
-
 import pandas as pd
-from iclr2024.src.paths import *
+from src.paths import *
 from src import fileutils
 from src.data import BinaryClassificationDataset
 

@@ -3,8 +3,6 @@ import os
 import psutil
 import argparse
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
-
 settings = {
     "data_name": "german",
     "action_set_name": "complex_1D",

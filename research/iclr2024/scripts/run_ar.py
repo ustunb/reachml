@@ -8,15 +8,13 @@ import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
-
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import recourse as rs
 from tqdm.auto import tqdm
 
-from iclr2024.src.paths import *
+from src.paths import *
 from src import fileutils
 
 

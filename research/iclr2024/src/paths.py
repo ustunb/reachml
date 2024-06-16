@@ -10,7 +10,7 @@ import os
 # Directories
 
 # path to the GitHub repository
-paper_dir = Path(os.path.join(os.getcwd(), 'iclr2024')).resolve()
+paper_dir = Path(os.path.join(os.getcwd(), "")).resolve()
 repo_dir = Path(os.getcwd()).resolve()
 
 # directory where we store datasets

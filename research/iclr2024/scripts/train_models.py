@@ -1,7 +1,6 @@
 import sys
 import os
 
-sys.path.append(os.path.join(os.getcwd(), "iclr2024"))
 import psutil
 import argparse
 from src import fileutils
