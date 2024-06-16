@@ -8,6 +8,8 @@
 
 Library for recourse verification and the accompanying code for the paper "[Prediction without Preclusion: Recourse Verification with Reachable Sets](https://arxiv.org/abs/2308.12820)" (ICLR 2024 Spotlight).
 
+*Recourse* is the ability of a decision subject to change a negative prediction about themselves issued by a predictive model. *Recourse verification* aims to tell, for a given predictive model, decision subject, and a specification of their feasible actions, whether there exists any action that flips the decision from negative to positive.
+
 ## Getting Started
 
 ### Installing the Library
@@ -33,7 +35,12 @@ pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ### Defining the Actionability Constraints
 
 The first step to recourse verification through reachable sets is defining the actionability
-constraints. This is done by configuring an `ActionSet` object.
+constraints, i.e., a specification of feasible actions that a decision subject can perform.
+Although each decision subject could have different constraints, we can perform recourse
+verification with *inherent* constraints, e.g., preserving feature encoding, immutability,
+or monotonicity of features like age.
+
+Specifying the actionability constraints is done by configuring an `ActionSet` object.
 ```python
 import pandas as pd
 
@@ -98,7 +105,7 @@ You should see the the following output:
 | 5 | job_type_c               | <bool> |    True    | 0  | 1  |              0 |         |         |
 +---+--------------------------+--------+------------+----+----+----------------+---------+---------+
 ```
-Note that by default the absolute lower and upper bounds of numeric features are inferred from the
+By default the absolute lower and upper bounds of numeric features are inferred from the
 input dataset, and if the actual upper bound of an actionable feature should be different, you
 have to override it:
 ```
@@ -142,7 +149,7 @@ You should see the following output:
 The 0-th entry is the original feature vector `x`. As you can see, the reachable set contains
 feature vectors obtained via changing the job type, and increasing `years_since_last_default`.
 Although we have set age to be immutable, because `years_since_last_default` is mutable and is
-linked to `age` through the `DirectionalLinkage` constraint, it wil change.
+linked to `age` through the `DirectionalLinkage` constraint, it will change.
 
 ### Using Reachable Sets
 Having the reachable set as a matrix of points, i.e., you can analyze it or use it to query
@@ -151,5 +158,5 @@ any positive prediction for points in the reachable set `np.any(clf.predict(reac
 
 ### More Examples
 Check out [this
-script](https://github.com/ustunb/reachml/blob/main/iclr2024/scripts/setup_dataset_actionset_fico.py)
+script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/setup_dataset_actionset_fico.py)
 which sets up the action set for the Fico dataset for a realistic example.
