@@ -13,32 +13,23 @@
 
 ## Installation
 
-The library relies on [IBM CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio). As
-of time of writing, the free version of CPLEX has two issues: (1) it does not work well with **Mac
-M1 architecture**, and (2) it has a limit on the number of constraints compared to the
-commercial/academic version. For most useful use cases, you want to install the package followed by
-an installation of the full version of CPLEX:
-```
-pip install git+https://github.com/ustunb/reachml#egg=reachml
-python path/to/cplex/setup.py install
-```
-where the path to the installer could be, e.g., `/opt/ibm/ILOG/CPLEX_Studio221/python/`.
-
-You can install the version of the library packaged with free CPLEX right away:
+You can install the library as follows:
 ```
 pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ```
 
+Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will seek to install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want to download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/risk-slim/blob/master/docs/cplex_instructions.md). 
+
 ## Quickstart
 
-The following example shows how to specify actions over the features in a classification task using an `ActionSet`. Given the `ActionSet` and a set of feature vectors $X$, we can then construct a `ReachableSet` for each point.
+The following example shows how to specify actionability constraints using `ActionSet` and to build a database of `ReachableSet` for each point.
 
 ```python
 import pandas as pd
 from reachml import ActionSet, ReachableSet, ReachableDatabase
 from reachml.constraints import OneHotEncoding, DirectionalLinkage
 
-# Simple toy dataset with 3 points and 
+# feature matrix with 3 points
 X = pd.DataFrame(
     {
         "age": [32, 19, 52],
@@ -53,53 +44,53 @@ X = pd.DataFrame(
 # Create an action set
 action_set = ActionSet(X)
 
-# Specify constraints on individual features
-action_set["age"].actionable = False # cannot change age
-action_set["marital_status"].actionable = False # should not change marital status
-action_set["years_since_last_default"].step_direction = 1 # can only increase
-action_set["years_since_last_default"].step_ub = 1 # should have recourse within 1 year
+# `ActionSet` infers the type and bounds on each feature from `X`. To see them:
+ print(action_set) 
 
-# Capture a one hot-encoding for job-type
+## print(action_set) should return the following output
+##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
+##|   | name                     |  type  | actionable | lb | ub | step_direction | step_ub | step_lb |
+##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
+##| 0 | age                      | <int>  |   False    | 19 | 52 |              0 |         |         |
+##| 1 | marital_status           | <bool> |   False    | 0  | 1  |              0 |         |         |
+##| 2 | years_since_last_default | <int>  |    True    | 0  | 21 |              1 |         |         |
+##| 3 | job_type_a               | <bool> |    True    | 0  | 1  |              0 |         |         |
+##| 4 | job_type_b               | <bool> |    True    | 0  | 1  |              0 |         |         |
+##| 5 | job_type_c               | <bool> |    True    | 0  | 1  |              0 |         |         |
+##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
+
+# Specify constraints on individual features
+action_set[["age", "marital_status"]].actionable = False # these features cannot or should not change
+action_set["years_since_last_default"].ub = 100 # set maximum value of feature to 100
+action_set["years_since_last_default"].step_direction = 1 # actions can only increase value
+action_set["years_since_last_default"].step_ub = 1 # limit actions to changes value by 1
+
+# Specify constraint to maintain one hot-encoding on `job_type`
 action_set.constraints.add(
     constraint=OneHotEncoding(names=["job_type_a", "job_type_b", "job_type_c"])
 )
 
-# Capture deterministic causal changes - if `years_since_last_default` increases, `age` must increase
-# This constraint will ensure that  `age` will change even though it is not actionable
+# Specify deterministic causal relationships 
+# if `years_since_last_default` increases, then `age` must increase commensurately
+# This will force `age` to change even though it is not immediately actionable
 action_set.constraints.add(
     constraint=DirectionalLinkage(
         names=["years_since_last_default", "age"], scales=[1, 1]
     )
 )
 
-print(action_set)
-# should return the following output
-##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
-##|   | name                     |  type  | actionable | lb | ub | step_direction | step_ub | step_lb |
-##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
-##| 0 | age                      | <int>  |   False    | 19 | 52 |              0 |         |         |
-##| 1 | marital_status           | <bool> |   False    | 0  | 1  |              0 |         |         |
-##| 2 | years_since_last_default | <int>  |    True    | 0  | 21 |              1 |       1 |         |
-##| 3 | job_type_a               | <bool> |    True    | 0  | 1  |              0 |         |         |
-##| 4 | job_type_b               | <bool> |    True    | 0  | 1  |              0 |         |         |
-##| 5 | job_type_c               | <bool> |    True    | 0  | 1  |              0 |         |         |
-##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
+# Check that `ActionSet` is consistent with observed data
+# For example, if features must obey one-hot encoding, this should be the case for X
+assert action_set.validate(X)
 
-# `ActionSet` infers absolute lower and upper bounds from the dataset so you will have to correct these manually
-action_set["years_since_last_default"].ub = 100
-
-# validate the action set
-assert action_set.validate(data)
-
-# Create the database of reachable sets for all points in a given dataset,
-# and save it to ./reachable_db.h5 file
-db = ReachableSetDatabase(action_set, path="reachable_db.h5")
+# Build a database of reachable sets for all points 
+db = ReachableSetDatabase(action_set, path="reachable_db.h5") #database stored in file `./reachable_db.h5`
 db.generate(data, overwrite=True)
 
-# Get the reachable set of a point
+# Pull reachable set for first point in dataset
 x = data.iloc[0]
 reachable_set = db[x]
-print(reachable_set)` should return the following output:
+print(reachable_set)` # should return the following output:
 ##    age  marital_status  years_since_last_default  job_type_a  job_type_b  job_type_c
 ## 0  32.0             1.0                       5.0         0.0         1.0         0.0
 ## 1  32.0             1.0                       5.0         0.0         0.0         1.0
@@ -111,7 +102,7 @@ print(reachable_set)` should return the following output:
 # Check if the point is assigned a fixed prediction
 np.any(clf.predict(reachable_set.X))
 ```
-Given a reachable set and a classifier `clf`, you can check if a point has recourse as `np.any(clf.predict(reachable_set.X))`
+Given a classifier `clf` with a predict method, you can test if a point has recourse as `np.any(clf.predict(reachable_set.X))`
 
 For more examples, check out [this
 script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/setup_dataset_actionset_fico.py) which sets up the action set for the FICO dataset.
@@ -121,9 +112,6 @@ script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/se
 For more about recourse verification, check out our paper ICLR 2024:
 
 [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
-
-The code to accompany the paper is available under `[research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/`
-
 
 If you use this library in your research, we would appreciate a citation:
 ```
@@ -137,3 +125,4 @@ url={https://openreview.net/forum?id=SCQfYpdoGE}
 }
 ```
 
+The code for the paper is available under `[research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/`
