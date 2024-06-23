@@ -45,7 +45,7 @@ X = pd.DataFrame(
 action_set = ActionSet(X)
 
 # `ActionSet` infers the type and bounds on each feature from `X`. To see them:
- print(action_set)
+print(action_set)
 
 ## print(action_set) should return the following output
 ##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
