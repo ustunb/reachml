@@ -5,11 +5,11 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2308.12820-b31b1b.svg)](https://arxiv.org/abs/2308.12820)
 [![CI](https://github.com/ustunb/reachml/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/ci.yml)
 
-`reach-ml` is a library for recourse verification. 
+`reachml` is a library for recourse verification.
 
 ## Background
 
-*Recourse* is the ability of a decision subject to change the prediction of a machine learning model through actions on its features. *Recourse verification* aims to tell if a decision subject is assigned a prediction that is fixed.  
+*Recourse* is the ability of a decision subject to change the prediction of a machine learning model through actions on their features. *Recourse verification* aims to tell if a decision subject is assigned a prediction that is fixed.
 
 ## Installation
 
@@ -18,7 +18,7 @@ You can install the library as follows:
 pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ```
 
-Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will seek to install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want to download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/risk-slim/blob/master/docs/cplex_instructions.md). 
+Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/risk-slim/blob/master/docs/cplex_instructions.md).
 
 ## Quickstart
 
@@ -45,7 +45,7 @@ X = pd.DataFrame(
 action_set = ActionSet(X)
 
 # `ActionSet` infers the type and bounds on each feature from `X`. To see them:
- print(action_set) 
+ print(action_set)
 
 ## print(action_set) should return the following output
 ##+---+--------------------------+--------+------------+----+----+----------------+---------+---------+
@@ -70,7 +70,7 @@ action_set.constraints.add(
     constraint=OneHotEncoding(names=["job_type_a", "job_type_b", "job_type_c"])
 )
 
-# Specify deterministic causal relationships 
+# Specify deterministic causal relationships
 # if `years_since_last_default` increases, then `age` must increase commensurately
 # This will force `age` to change even though it is not immediately actionable
 action_set.constraints.add(
@@ -83,14 +83,14 @@ action_set.constraints.add(
 # For example, if features must obey one-hot encoding, this should be the case for X
 assert action_set.validate(X)
 
-# Build a database of reachable sets for all points 
+# Build a database of reachable sets for all points
 db = ReachableSetDatabase(action_set, path="reachable_db.h5") #database stored in file `./reachable_db.h5`
 db.generate(data, overwrite=True)
 
 # Pull reachable set for first point in dataset
 x = data.iloc[0]
 reachable_set = db[x]
-print(reachable_set)` # should return the following output:
+print(reachable_set) # should return the following output:
 ##    age  marital_status  years_since_last_default  job_type_a  job_type_b  job_type_c
 ## 0  32.0             1.0                       5.0         0.0         1.0         0.0
 ## 1  32.0             1.0                       5.0         0.0         0.0         1.0
@@ -98,9 +98,6 @@ print(reachable_set)` # should return the following output:
 ## 3  33.0             1.0                       6.0         0.0         0.0         1.0
 ## 4  33.0             1.0                       6.0         0.0         1.0         0.0
 ## 5  33.0             1.0                       6.0         1.0         0.0         0.0
-
-# Check if the point is assigned a fixed prediction
-np.any(clf.predict(reachable_set.X))
 ```
 Given a classifier `clf` with a predict method, you can test if a point has recourse as `np.any(clf.predict(reachable_set.X))`
 
@@ -109,20 +106,17 @@ script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/se
 
 ### Resources and Citation
 
-For more about recourse verification, check out our paper ICLR 2024:
-
-[Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
+For more about recourse verification, check out our paper ICLR 2024 spotlight paper: [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
 
 If you use this library in your research, we would appreciate a citation:
 ```
-@inproceedings{
-kothari2024prediction,
-title={Prediction without Preclusion: Recourse Verification with Reachable Sets},
-author={Avni Kothari and Bogdan Kulynych and Tsui-Wei Weng and Berk Ustun},
-booktitle={The Twelfth International Conference on Learning Representations},
-year={2024},
-url={https://openreview.net/forum?id=SCQfYpdoGE}
+@inproceedings{kothari2024prediction,
+    title={Prediction without Preclusion: Recourse Verification with Reachable Sets},
+    author={Avni Kothari and Bogdan Kulynych and Tsui-Wei Weng and Berk Ustun},
+    booktitle={The Twelfth International Conference on Learning Representations},
+    year={2024},
+    url={https://openreview.net/forum?id=SCQfYpdoGE}
 }
 ```
 
-The code for the paper is available under `[research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/`
+The code for the paper is available under [research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/).
