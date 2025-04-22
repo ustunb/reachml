@@ -1,22 +1,19 @@
-import os
 import pytest
 import pandas as pd
 import numpy as np
+from reachml.paths import tests_dir
 from reachml.action_set import ActionSet
 from reachml.constraints import *
 
 
-tests_dir = os.path.dirname(os.path.realpath(__file__))
-
-
 @pytest.fixture(params=["credit"])
-def test_case(request, credit_data):
-    X = credit_data
+def test_case(request):
+    X = pd.read_csv(tests_dir / "credit.csv").drop(columns=["NoDefaultNextMonth"])
     A = ActionSet(X)
     A["Married"].actionable = False
-    A[["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]].actionable = (
-        False
-    )
+    A[
+        ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
+    ].actionable = False
     A["EducationLevel"].step_direction = 1
     A["EducationLevel"].lb = 0
     A["EducationLevel"].ub = 3
@@ -71,9 +68,9 @@ def test_action_bounds_monotonic(test_case):
 
     A = ActionSet(X)
     A["Married"].actionable = False
-    A[["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]].actionable = (
-        False
-    )
+    A[
+        ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
+    ].actionable = False
     A["EducationLevel"].ub = 3
     A["EducationLevel"].lb = 0
 
@@ -127,7 +124,8 @@ def test_action_bounds_partition_masking(test_case):
 
     x = X.iloc[0].values
     part = A.actionable_partition[1]
-    n_actionable_in_part = sum(A[part].actionable)
+    part_A = A[part]
+    n_actionable_in_part = sum(part_A.actionable)
 
     # expected
     expected_lb = np.zeros(len(x), dtype=float)
@@ -136,12 +134,12 @@ def test_action_bounds_partition_masking(test_case):
     expected_ub[[3, 4, 5]] = [1.0, 1.0, 1.0]
 
     # actual
-    lb = A.get_bounds(x, bound_type="lb", part=part)
-    ub = A.get_bounds(x, bound_type="ub", part=part)
+    lb = part_A.get_bounds(x[part], bound_type="lb")
+    ub = part_A.get_bounds(x[part], bound_type="ub")
     assert np.count_nonzero(lb) <= n_actionable_in_part
     assert np.count_nonzero(ub) <= n_actionable_in_part
-    assert np.array_equal(lb, expected_lb)
-    assert np.array_equal(ub, expected_ub)
+    assert np.array_equal(lb, expected_lb[part])
+    assert np.array_equal(ub, expected_ub[part])
 
 
 if __name__ == "__main__":

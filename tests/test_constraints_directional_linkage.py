@@ -9,12 +9,12 @@ constraints: [1, multiple_independent, multiple_overlapping]
 action_on_source_violates_target_type: [True, False]
 action_on_source_violates_target_bounds: [True, False]
 """
-
 import pytest
 import pandas as pd
 import numpy as np
 import itertools
-from reachml import ActionSet, ReachableSetEnumerator
+from reachml import ActionSet
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.directional_linkage import DirectionalLinkage
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
@@ -167,8 +167,7 @@ test_cases_with_valid_type = (
 def test_enumeration_with_one_target(
     target_type, target_scale, target_actionability, target_monotonicity
 ):
-    # pytest.skip()
-    # setup test case
+        # setup test case
     test_case = get_2d_test_case(t=target_type)
     X = test_case["X"]
     A = test_case["A"]
@@ -194,8 +193,8 @@ def test_enumeration_with_one_target(
 
     for idx, x in enumerate(X.values):
         expected_set = expected_reachable_sets.get(tuple(x))
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         try:
             assert np.isclose(sortrows(reachable_set.X), sortrows(expected_set)).all()

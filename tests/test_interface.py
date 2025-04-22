@@ -1,22 +1,19 @@
-import os
 import pytest
 import numpy as np
 import pandas as pd
+from reachml.paths import tests_dir
 from reachml.action_set import ActionSet
 from reachml.constraints import *
 
 
-tests_dir = os.path.dirname(os.path.realpath(__file__))
-
-
 @pytest.fixture(params=["credit"])
-def test_case(request, credit_data):
-    X = credit_data.drop(columns=["NoDefaultNextMonth"])
+def test_case(request):
+    X = pd.read_csv(tests_dir / "credit.csv").drop(columns=["NoDefaultNextMonth"])
     A = ActionSet(X)
     A["Married"].actionable = False
-    A[["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]].actionable = (
-        True
-    )
+    A[
+        ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
+    ].actionable = True
     A["EducationLevel"].step_direction = 1
     A["EducationLevel"].lb = 0
     A["EducationLevel"].ub = 3

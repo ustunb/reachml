@@ -2,19 +2,19 @@
 Test Strategy
 todo
 """
-
-import os
 import pytest
 import pandas as pd
 import numpy as np
+from reachml.paths import tests_dir
 from reachml import *
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.onehot import OneHotEncoding
 
 
 @pytest.fixture(params=["credit_onehot", "credit_onehot_all_immutable"])
-def test_case(request, credit_data):
+def test_case(request):
     if "credit_onehot" in request.param:
-        X = credit_data
+        X = pd.read_csv(tests_dir / "credit.csv")
         names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
 
     A = ActionSet(X)
@@ -98,13 +98,13 @@ def test_enumeration_with_onehot_constraints(limit_type, limit_value):
     A.constraints.add(constraint=cons)
     for idx, x in enumerate(X.values):
         if cons.check_feasibility(x):
-            enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            constrained_reachable_set = enumerator.enumerate()
-            assert constrained_reachable_set.complete
-            assert all([cons.check_feasibility(x) for x in constrained_reachable_set.X])
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set.generate()
+            assert reachable_set.complete
+            assert all([cons.check_feasibility(x) for x in reachable_set.X])
         else:
             with pytest.raises(AssertionError):
-                ReachableSetEnumerator(x=x, action_set=A)
+                EnumeratedReachableSet(x=x, action_set=A).generate()
             with pytest.raises(AssertionError):
                 cons.adapt(x)
 
@@ -139,11 +139,11 @@ def test_enumeration_with_onehot_constraints_overlapping():
     feature_indices = list(set(SA + SB))
     assert feature_indices in A.partition
     for idx, x in enumerate(X.values):
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
-        assert np.equal(np.sum(constrained_reachable_set.X[:, SA], axis=1), 1.0).all()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
+        assert np.equal(np.sum(reachable_set.X[:, SA], axis=1), 1.0).all()
         assert np.less_equal(
-            np.sum(constrained_reachable_set.X[:, SB], axis=1), 2.0
+            np.sum(reachable_set.X[:, SB], axis=1), 2.0
         ).all()
 
 
@@ -164,13 +164,13 @@ def test_enumeration_with_onehot_constraints_immutable(limit_type, limit_value):
     )
     for idx, x in enumerate(X.values):
         if is_feasible(x):
-            enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            constrained_reachable_set = enumerator.enumerate()
-            assert constrained_reachable_set.complete
-            assert all([is_feasible(x) for x in constrained_reachable_set.X])
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set.generate()
+            assert reachable_set.complete
+            assert all([is_feasible(x) for x in reachable_set.X])
         else:
             with pytest.raises(AssertionError):
-                ReachableSetEnumerator(x=x, action_set=A)
+                EnumeratedReachableSet(x=x, action_set=A)
 
 
 def test_enumeration_with_onehot_constraints_monotonic():
@@ -194,8 +194,8 @@ def test_enumeration_with_onehot_constraints_monotonic():
     }
 
     for idx, x in enumerate(X.values):
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         expected_set = np.array(expected_reachable_sets.get(tuple(x)))
         assert expected_set in reachable_set

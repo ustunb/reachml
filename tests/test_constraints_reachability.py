@@ -2,22 +2,19 @@
 Test Strategy
 todo
 """
-
-import os
 import pytest
 import pandas as pd
 import numpy as np
 from reachml import *
+from reachml.reachable_set import EnumeratedReachableSet
+from reachml.paths import tests_dir
 from reachml.constraints.reachability import ReachabilityConstraint
 
 
-tests_dir = os.path.dirname(os.path.realpath(__file__))
-
-
 @pytest.fixture(params=["credit_onehot", "credit_onehot_all_immutable"])
-def test_case(request, credit_data):
+def test_case(request):
     if "credit_onehot" in request.param:
-        X = credit_data
+        X = pd.read_csv(tests_dir / "credit.csv")
         names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
 
     A = ActionSet(X)
@@ -50,8 +47,9 @@ def reachability(request, values):
 def test_initialization(test_case, values, reachability):
     X = test_case["X"]
     A = test_case["A"]
-    params = {"values": values, "reachability": reachability}
-    cons = ReachabilityConstraint(names=test_case["names"], **params)
+    names = test_case["names"]
+    params = {"names": names, "values": values, "reachability": reachability}
+    cons = ReachabilityConstraint(**params)
     print(str(cons))
     assert set(cons.parameters) == set(params.keys())
     for name, value in params.items():
@@ -70,7 +68,7 @@ def test_initialization(test_case, values, reachability):
 def test_contains(test_case):
     A = test_case["A"]
     x = np.array([0.0, 0.0, 0.0, 0.0])
-    reachable_set = ReachableSet(A, x, complete=True, values=np.vstack([x, np.eye(4)]))
+    reachable_set = EnumeratedReachableSet(A, x, complete=True, values=np.vstack([x, np.eye(4)]))
 
     y = np.array([2, 2, 2, 2])
     assert y not in reachable_set
@@ -105,24 +103,24 @@ def test_vacuous_reachability_constraints(dataset_actionset_2d):
     print(f"A: {A}")
 
     for x in X.values:
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
         R = np.array(expected_reachable_set.get(tuple(x)))
         n_expected = R.shape[0]
-        reachable_set = enumerator.enumerate(max_points=n_expected)
+        reachable_set.generate(max_points=n_expected)
         assert reachable_set.complete
         assert len(reachable_set) == n_expected
         assert R in reachable_set
 
-        # calling enumerate again should not change anything
-        reachable_set = enumerator.enumerate()
+        # calling generate again should not change anything
+        reachable_set.generate()
         assert len(reachable_set) == n_expected and R in reachable_set
 
         # adding a reachability constraint should not change anything
         const_id = A.constraints.add(
             ReachabilityConstraint(names=X.columns.tolist(), values=X.values)
         )
-        constrained_enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = constrained_enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert reachable_set == constrained_reachable_set
         A.constraints.drop(const_id)
 
@@ -174,16 +172,16 @@ def test_vacuous_reachability_constraints_with_overlap():
         feature_indices = A.get_feature_indices(["x0", "x1", "x2"])
         assert feature_indices in A.partition
 
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert values in constrained_reachable_set
         assert constrained_reachable_set.complete
         assert len(constrained_reachable_set) == values.shape[0]
 
         # dropping the constraint should lead to the right solution
         A.constraints.clear()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert values in reachable_set
         assert reachable_set.complete
         assert reachable_set == constrained_reachable_set
@@ -214,18 +212,18 @@ def test_reachability_constraints_for_fixed_point(dataset_actionset_2d):
                 reachability=reachability_matrix,
             )
         )
-        constrained_enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = constrained_enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert constrained_reachable_set.complete
         assert len(constrained_reachable_set) == 1
         assert np.array_equal(constrained_reachable_set.X[0, :], x)
 
         # dropping the constraint should lead to the right solution
         A.constraints.drop(const_id)
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
         R = np.array(expected_reachable_set.get(tuple(x)))
         n_expected = R.shape[0]
-        reachable_set = enumerator.enumerate(max_points=n_expected)
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate(max_points=n_expected)
         assert reachable_set.complete
         assert len(reachable_set) == n_expected
         assert R in reachable_set
@@ -283,8 +281,8 @@ def test_enumeration_with_overlapping():
         feature_indices = A.get_feature_indices(["x0", "x1", "x2"])
         assert feature_indices in A.partition
 
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert [1, 0, 1] not in constrained_reachable_set
         assert [0, 0, 1] not in constrained_reachable_set
         assert values in constrained_reachable_set
@@ -293,8 +291,8 @@ def test_enumeration_with_overlapping():
 
         # dropping the constraint should lead to the right solution
         A.constraints.clear()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         assert values in reachable_set
         print(reachable_set.X)
@@ -349,16 +347,16 @@ def test_enumeration_for_reachability_on_onehot_encoding():
             )
         )
 
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert constrained_reachable_set.complete
         limits = np.sum(constrained_reachable_set.X, axis=1)
         assert np.all(limits <= 1)
 
         # dropping the constraint should lead to the right solution
         A.constraints.clear()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         assert values in reachable_set
         assert len(reachable_set) == values.shape[0]
@@ -401,8 +399,8 @@ def test_enumeration_for_reachability_on_ordinal_encoding_with_1step():
     )
 
     for idx, x in enumerate(X.values):
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         expected_set = np.array(expected_reachable_sets.get(tuple(x)))
         limits = np.sum(reachable_set.X, axis=1)
         assert np.all(limits <= 1)
@@ -459,16 +457,16 @@ def test_enumeration_for_reachability_on_thermometer_encoding():
             )
         )
 
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert constrained_reachable_set.complete
         assert X.values in constrained_reachable_set
         assert len(constrained_reachable_set) == X.values.shape[0]
 
         # dropping the constraint should lead to the right solution
         A.constraints.clear()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         assert values in reachable_set
 
@@ -520,15 +518,15 @@ def test_enumeration_for_reachability_on_thermometer_encoding_monotonic():
             )
         )
 
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        constrained_reachable_set = enumerator.enumerate()
+        constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        constrained_reachable_set.generate()
         assert constrained_reachable_set.complete
         assert X.values[idx:,] in constrained_reachable_set
 
         # dropping the constraint lead to infeasible actions
         A.constraints.clear()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
-        reachable_set = enumerator.enumerate()
+        reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+        reachable_set.generate()
         assert reachable_set.complete
         assert len(reachable_set) == 2 ** (len(A) - np.sum(x == 1))
 
@@ -570,12 +568,12 @@ def test_enumeration_in_1d():
 
     #
     x = X.iloc[0].values
-    enumerator = ReachableSetEnumerator(x=x, action_set=A)
-    constrained_reachable_set = enumerator.enumerate()
-    assert constrained_reachable_set.complete
-    R = constrained_reachable_set.X
-    assert np.isin(X[:, 0], [0, 1]).all()
-    assert np.isin(X[:, 1], [0.0, 0.5, 0.7, 1.0]).all()
+    reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+    reachable_set.generate()
+    assert reachable_set.complete
+    R = reachable_set.X
+    assert np.isin(X.values[:, 0], [0, 1]).all()
+    assert np.isin(X.values[:, 1], [0.0, 0.5, 0.7, 1.0]).all()
 
 
 if __name__ == "__main__":

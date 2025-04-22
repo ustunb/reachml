@@ -6,11 +6,11 @@ force: [True, False]
 change_violates_target_bound: [True, False]
 change_violates_target_sign: [True, False]
 """
-
 import pytest
 import pandas as pd
 import numpy as np
 from reachml import *
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.switch import MutabilitySwitch
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
@@ -184,8 +184,8 @@ def test_enumeration_with_switch_constraints(on_value, force):
         if cons.check_feasibility(x):
             print(f"enumeration for x={x}\n")
             expected_set = test_case["expected_sets"].get(tuple(x))
-            enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            reachable_set = enumerator.enumerate()
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set.generate()
             assert reachable_set.complete
             # print(f'expected_set.X\n{expected_set}\n')
             # print(f'reachable_set.X\n{reachable_set.X}\n')
