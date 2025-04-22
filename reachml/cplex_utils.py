@@ -1,15 +1,20 @@
-import numpy as np
-import pandas as pd
 import operator
-from cplex import Cplex, SparsePair
-from cplex.exceptions import CplexError
 from functools import reduce
 from itertools import chain
 
-concat = lambda d: list(chain.from_iterable(d.values()))
-combine = lambda a, b: {
-    key: a.get(key, []) + b.get(key, []) for key in (a.keys() | b.keys())
-}
+import numpy as np
+import pandas as pd
+from cplex import Cplex, SparsePair
+from cplex.exceptions import CplexError
+
+
+def concat(d):
+    return list(chain.from_iterable(d.values()))
+
+
+def combine(a, b):
+    return {key: a.get(key, []) + b.get(key, []) for key in (a.keys() | b.keys())}
+
 
 # feasibility/solution checking
 CPX_INFEASIBLE_STATUS_CODES = (103,)

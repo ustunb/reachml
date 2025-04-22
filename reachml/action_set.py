@@ -1,51 +1,89 @@
+import warnings
+from copy import deepcopy
+from itertools import chain
+
 import numpy as np
 import pandas as pd
-from itertools import chain
-import warnings
 from prettytable import PrettyTable
+
 from .action_element import ActionElement
 from .constraints.abstract import ActionabilityConstraint
 from .constraints.directional_linkage import DirectionalLinkage
-from .utils import (
-    check_variable_names,
-    ensure_matrix,
-    expand_values,
-    check_feature_matrix,
-)
+from .utils import check_feature_matrix, check_variable_names, expand_values
 
 
-class ActionSet(object):
+class ActionSet:
     """
     Class to represent and manipulate feasible actions for the features in a dataset
     """
 
-    def __init__(self, X, names=None, **kwargs):
+    def __init__(
+        self,
+        X,
+        names=None,
+        indices=None,
+        elements=None,
+        constraints=None,
+        parent=None,
+        **kwargs,
+    ):
         """
         :param X: pandas.DataFrame or numpy matrix representing a feature matrix (features are columns, samples are rows)
                   X must contain at least 1 column and at least 1 row
         :param names: list of strings containing variable names.
                       names is only required if X is a numpy matrix
         """
-        X, names = ensure_matrix(X, names=names)
-
-        # validate X/Names
-        assert check_variable_names(names)
-        assert check_feature_matrix(X, d=len(names))
+        # validate X/Names if creating from scratch
+        if elements is None:
+            assert isinstance(X, (pd.DataFrame, np.ndarray)), (
+                "`X` must be pandas.DataFrame or numpy.ndarray"
+            )
+            if isinstance(X, pd.DataFrame):
+                names = X.columns.tolist()
+                X = X.values
+            assert check_variable_names(names)
+            assert check_feature_matrix(X, d=len(names))
 
         # key properties
-        self._names = [str(n) for n in names]
-        self._indices = {n: j for j, n in enumerate(self._names)}
-        self._elements = {
-            n: ActionElement.from_values(name=n, values=X[:, j])
-            for j, n in enumerate(self._names)
-        }
+        self._names = names if names is not None else [str(n) for n in names]
+        self._indices = (
+            indices
+            if indices is not None
+            else {n: j for j, n in enumerate(self._names)}
+        )
+        self._elements = (
+            elements
+            if elements is not None
+            else {
+                n: ActionElement.from_values(name=n, values=X[:, j])
+                for j, n in enumerate(self._names)
+            }
+        )
         self._constraints = _ConstraintInterface(parent=self)
+
+        # build constraints
+        if constraints is not None:
+            for con in constraints:
+                if parent is not None:  # this is a slice of an existing action set
+                    con = deepcopy(con)  # monitor memory usage
+                self._constraints.add(con)
+
+        self._parent = parent
         assert self._check_rep()
 
+    # harry: what is this for?
     def _check_rep(self):
-        """check if representation invariants are True"""
-        # elements = self._elements.values()
-        # assert all([isinstance(e, ActionElement) for e in elements])
+        """
+        checks representation
+        :return: True if representation is valid
+        """
+        # check that names and indices are consistent
+        assert set(self._names) == set(self._indices.keys())
+        assert set(self._indices.values()) == set(range(len(self)))
+        # check that elements are consistent
+        assert set(self._names) == set(self._elements.keys())
+        # check that constraints are consistent
+        assert self._constraints.__check_rep__()
         return True
 
     @property
@@ -53,9 +91,25 @@ class ActionSet(object):
         return self._names
 
     @property
+    def parent(self):
+        return self._parent
+
+    @property
     def discrete(self):
-        """:return: True if action set is discrete"""
+        """:return: True if action set is discrete i.e., all actionable features are discrete"""
         return all([e.variable_type in (int, bool) for e in self if e.actionable])
+
+    @property
+    def can_enumerate(self):
+        """:return: True if action set can be enumerated"""
+        return any(self.actionable) and all(
+            [e.variable_type in (int, bool) for e in self if e.actionable]
+        )
+
+    @property
+    def actionable_features(self):
+        """:return: list of actionable feature indices"""
+        return {self._indices[e.name] for e in self if e.actionable}
 
     def get_feature_indices(self, names):
         """
@@ -74,14 +128,14 @@ class ActionSet(object):
 
     def validate(self, X, warn=True, return_df=False):
         """
-        validate the bounds and constraints in the action set on a set of feature vectors
+        check if feature vectors obey the bounds and constraints in an action set
+        this function should be used as a minimal test for validity
         :param X: feature matrix
         :param warn: if True will issue a warning
         :param return_df: if True, will return a dataframe highlighting which points are infeasible
-        :return: True/False if X meets all the bounds and constraints in this action set (default)
+        :return: True/False if X obeys all bounds and constraints in this action set (default)
                  if return_df = True, then it will return a DataFrame showing which points in X are violated
         """
-        X, _ = ensure_matrix(X)
         assert check_feature_matrix(X, d=len(self))
         # todo: add fast return
         # fast_return = warn == False and return_df == False
@@ -103,7 +157,7 @@ class ActionSet(object):
         valid_lb = np.all(lb_chk)
         valid_ub = np.all(ub_chk)
 
-        # todo: handling for immutable attribuets within constraints
+        # todo: handle for immutable attributes within constraints
         # check feasibility of each constraint
         # con_chk = {con.id: np.apply_along_axis(con.check_feasibility, arr = U, axis = 0) for con in self.constraints}
         con_chk = {
@@ -116,10 +170,10 @@ class ActionSet(object):
 
         if warn:
             if not valid_lb:
-                warnings.warn(f"X contains points that exceed lower bounds")
+                warnings.warn("X contains points that exceed lower bounds")
 
             if not valid_ub:
-                warnings.warn(f"X contains points that exceed upper bounds")
+                warnings.warn("X contains points that exceed upper bounds")
 
             if not valid_constraints:
                 warnings.warn(
@@ -192,7 +246,7 @@ class ActionSet(object):
         )
         return df
 
-    def get_bounds(self, x, bound_type, part=None):
+    def get_bounds(self, x, bound_type):
         """
         :param x: point
         :param bound_type: 'lb' or 'ub'
@@ -200,16 +254,9 @@ class ActionSet(object):
         :return:
         """
         assert bound_type in ("lb", "ub"), f"invalid bound_type: {bound_type}"
-        if part is None:
-            out = [
-                aj.get_action_bound(xj, bound_type=bound_type)
-                for aj, xj in zip(self, x)
-            ]
-        else:
-            out = [
-                aj.get_action_bound(xj, bound_type=bound_type) if j in part else 0.0
-                for j, (aj, xj) in enumerate(zip(self, x))
-            ]
+        out = [
+            aj.get_action_bound(xj, bound_type=bound_type) for aj, xj in zip(self, x)
+        ]
         return out
 
     #### built-ins ####
@@ -218,6 +265,12 @@ class ActionSet(object):
 
     def __iter__(self):
         return (self._elements[n] for n in self._names)
+
+    def __str__(self):
+        return tabulate_actions(self)
+
+    def __repr__(self):
+        return tabulate_actions(self)
 
     def __eq__(self, other):
         out = (
@@ -229,41 +282,65 @@ class ActionSet(object):
         return out
 
     #### getter/setter methods ####
-    def __getitem__(self, index):
-        if isinstance(index, str):
-            return self._elements[index]
-        elif isinstance(index, (int, np.int_)):
-            return self._elements[self._names[index]]
-        elif isinstance(index, list):
-            if isinstance(index[0], int):
-                names = [self._names[j] for j in index]
-            elif isinstance(index[0], bool):
-                names = [self._names[j] for j, v in enumerate(index) if v]
-            elif isinstance(index[0], str):
-                names = index
-            return _ActionSlice([self._elements[n] for n in names])
-        elif isinstance(index, np.ndarray):
-            names = np.array(self._names)[index].tolist()
-            return _ActionSlice([self._elements[n] for n in names])
-        elif isinstance(index, slice):
-            return _ActionSlice([self._elements[n] for n in self._names[index]])
-        else:
-            raise IndexError("index must be str, int, a list of strings/int or a slice")
-
     def __setitem__(self, name, e):
         assert isinstance(e, ActionElement), "ActionSet can only contain ActionElements"
         assert name in self._names, f"no variable with name {name} in ActionSet"
         self._elements.update({name: e})
 
-    def __getattribute__(self, attr_name):
-        if attr_name[0] == "_" or (attr_name not in ActionElement.__annotations__):
-            return object.__getattribute__(self, attr_name)
+    def __getitem__(self, index):
+        match index:
+            case str():
+                out = self._elements[index]
+            case int() | np.int_():
+                out = self._elements[self._names[index]]
+            case list() | slice() | np.ndarray():
+                # transform array or slice to list
+                if isinstance(index, np.ndarray):
+                    index = index.tolist()
+                elif isinstance(index, slice):
+                    index = list(range(len(self)))[index]
+
+                # discover components
+                if isinstance(index[0], int):
+                    names = [self._names[j] for j in index]
+                    idx_lst = index
+                elif isinstance(index[0], bool):
+                    names = [self._names[j] for j, v in enumerate(index) if v]
+                    idx_lst = [j for j, v in enumerate(index) if v]
+                elif isinstance(index[0], str):
+                    names = index
+                    idx_lst = [self._indices[n] for n in names]
+
+                # constraints
+                out = ActionSet(
+                    X=[],
+                    names=names,
+                    indices={n: j for j, n in enumerate(names)},
+                    elements={n: self._elements[n] for n in names},
+                    constraints=self.constraints.get_associated_constraints(idx_lst),
+                    parent=self,
+                )
+            case _:
+                raise IndexError(
+                    "index must be str, int, slice, or a list of names or indices"
+                )
+
+        return out
+
+    def __getattribute__(self, name):
+        if name[0] == "_" or (name not in ActionElement.__annotations__):
+            return object.__getattribute__(self, name)
         else:
-            return [
-                getattr(self._elements[n], attr_name) for n, j in self._indices.items()
-            ]
+            return [getattr(self._elements[n], name) for n, j in self._indices.items()]
 
     def __setattr__(self, name, value):
+        """
+        sets attribuets with broadcasting
+        :param name:
+        :param value:
+        :return:
+        """
+        # broadcast values
         if hasattr(self, "_elements") and hasattr(ActionElement, name):
             attr_values = expand_values(value, len(self))
             for n, j in self._indices.items():
@@ -271,64 +348,8 @@ class ActionSet(object):
         else:
             object.__setattr__(self, name, value)
 
-    #### printing
-    def __str__(self):
-        return tabulate_actions(self)
 
-    def __repr__(self):
-        return tabulate_actions(self)
-
-    def to_latex(self):
-        """
-        :param action_set: ActionSet object
-        :return: formatted latex table summarizing the action set for publications
-        """
-        df = self.df
-        tex_binary_str = "$\\{0,1\\}$"
-        tex_integer_str = "$\\mathbb{Z}$"
-        tex_real_str = "$\\mathbb{R}$"
-
-        new_types = [tex_real_str] * len(df)
-        new_ub = [f"{v:1.1f}" for v in df["ub"].values]
-        new_lb = [f"{v:1.1f}" for v in df["lb"].values]
-
-        for i, t in enumerate(df["variable_type"]):
-            ub, lb = df["ub"][i], df["lb"][i]
-            if t in (int, bool):
-                new_ub[i] = f"{int(ub)}"
-                new_lb[i] = f"{int(lb)}"
-                new_types[i] = tex_binary_str if t in bool else tex_integer_str
-
-        df["variable_type"] = new_types
-        df["ub"] = new_ub
-        df["lb"] = new_lb
-
-        df["mutability"] = df["actionable"].map(
-            {False: "no", True: "yes"}
-        )  # todo change
-        up_idx = df["actionable"] & df["step_direction"] > 0
-        dn_idx = df["actionable"] & df["step_direction"] < 0
-        df.loc[up_idx, "mutability"] = "only increases"
-        df.loc[dn_idx, "mutability"] = "only decreases"
-
-        df = df.drop(["actionable", "step_direction"], axis=1)
-        df = df[["name", "variable_type", "lb", "ub", "mutability"]]
-        df = df.rename(
-            columns={
-                "name": "Name",
-                "variable_type": "Type",
-                "actionability": "Actionability",
-                "lb": "LB",
-                "ub": "UB",
-            }
-        )
-
-        table = df.to_latex(index=False, escape=False)
-        table = table.replace("_", "\_")
-        return table
-
-
-class _ConstraintInterface(object):
+class _ConstraintInterface:
     """
     Class to represent and manipulate actionability constraints that involve 2+ features
     """
@@ -345,14 +366,14 @@ class _ConstraintInterface(object):
         assert np.greater_equal(all_ids, 0).all(), "ids should be positive integers"
         assert set(all_ids) == set(self._df.const_id), "map ids should match df ids"
         for i, cons in self._map.items():
-            assert (
-                len(self._df.const_id == i) >= 1
-            ), "expecting at least 1 feature per constraint"
+            assert len(self._df.const_id == i) >= 1, (
+                "expecting at least 1 feature per constraint"
+            )
             # todo: check that self._df only contains 1 feature_idx per constraint_id pair
         if len(all_ids) > 0:
-            assert self._next_id > max(
-                all_ids
-            ), "next_id should exceed current largest constraint id"
+            assert self._next_id > max(all_ids), (
+                "next_id should exceed current largest constraint id"
+            )
         return True
 
     @property
@@ -391,6 +412,7 @@ class _ConstraintInterface(object):
         """
         assert isinstance(constraint, ActionabilityConstraint)
         assert not self.__contains__(constraint)
+        constraint.parent = self.parent
         const_id = self._next_id
         self._map.update({const_id: constraint})
         self._next_id += 1
@@ -402,8 +424,7 @@ class _ConstraintInterface(object):
                 "feature_idx": self.parent.get_feature_indices(constraint.names),
             }
         )
-        self._df = pd.concat([self._df, df_new])
-        constraint.parent = self.parent
+        self._df = pd.concat([self._df, df_new]).reset_index(drop=True)
         assert self.__check_rep__()
         return const_id
 
@@ -438,8 +459,9 @@ class _ConstraintInterface(object):
 
     def get_associated_features(self, i, return_constraint_ids=False):
         """
-        :param i:
-        :return:
+        returns a list of features linked with feature i via constraints
+        :param i: feature index
+        :return: list of feature indices
         """
         df = self._df
         constraint_matches = {}
@@ -454,6 +476,28 @@ class _ConstraintInterface(object):
 
         if return_constraint_ids:
             out = (out, constraint_matches)
+
+        return out
+
+    def get_associated_constraints(self, features, return_ids=False):
+        """
+        returns constraints associated with a set of features
+        :param features: list of feature indices
+        :param return_ids: if True, will return a list of constraint ids
+        :return: list of constraints or constraint ids
+        """
+        const_bool = (
+            self.df.groupby("const_id")[["feature_idx"]]
+            .agg(set)
+            .apply(lambda x: x["feature_idx"].issubset(set(features)), axis=1)
+        )  # boolean series
+
+        const_ids = const_bool[const_bool].index
+
+        if return_ids:
+            out = const_ids
+        else:
+            out = [self._map[i] for i in const_ids]
 
         return out
 
@@ -494,43 +538,6 @@ class _ConstraintInterface(object):
         return out
 
 
-class _ActionSlice(object):
-    """
-    Class to set ActionElement properties by slicing.
-    This class allows us to support commands like:
-        a = ActionSet(...)
-        a[1:2].ub = 2
-    """
-
-    def __init__(self, action_elements):
-        self._indices = {e.name: j for j, e in enumerate(action_elements)}
-        self._elements = {e.name: e for e in action_elements}
-
-    def __getattr__(self, name):
-        if name in ("_indices", "_elements"):
-            object.__getattr__(self, name)
-        else:
-            return [getattr(self._elements[n], name) for n, j in self._indices.items()]
-
-    def __setattr__(self, name, value):
-        if name in ("_indices", "_elements"):
-            object.__setattr__(self, name, value)
-        else:
-            assert hasattr(ActionElement, name)
-            attr_values = expand_values(value, len(self._indices))
-            for n, j in self._indices.items():
-                setattr(self._elements[n], name, attr_values[j])
-
-    def __len__(self):
-        return len(self._indices)
-
-    def __str__(self):
-        return tabulate_actions(self)
-
-    def __repr__(self):
-        return str(self)
-
-
 def tabulate_actions(action_set):
     # todo: update table to show partitions
     # todo: add also print constraints
@@ -544,7 +551,8 @@ def tabulate_actions(action_set):
     FMT = {bool: "1.0f", int: "1.0f", float: "1.2f"}
     t = PrettyTable()
     vtypes = [TYPES[v] for v in action_set.variable_type]
-    t.add_column("", list(range(len(action_set))), align="r")
+    # t.add_column("", list(range(len(action_set))), align="r")
+    t.add_column("", list(action_set._indices.values()), align="r")
     t.add_column("name", action_set.name, align="l")
     t.add_column("type", vtypes, align="c")
     t.add_column("actionable", action_set.actionable, align="c")
