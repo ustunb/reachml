@@ -1,0 +1,12 @@
+header,is_outcome,is_group_attribute,type
+NotSeriousDlqin2yrs,TRUE,,boolean
+RevolvingUtilizationOfUnsecuredLines,FALSE,,numeric
+age,FALSE,,numeric
+NumberOfTime30-59DaysPastDueNotWorse,FALSE,,numeric
+DebtRatio,FALSE,,float
+MonthlyIncome,FALSE,,numeric
+NumberOfOpenCreditLinesAndLoans,FALSE,,numeric
+NumberOfTimes90DaysLate,FALSE,,numeric
+NumberRealEstateLoansOrLines,FALSE,,numeric
+NumberOfTime60-89DaysPastDueNotWorse,FALSE,,numeric
+NumberOfDependents,FALSE,,numeric
