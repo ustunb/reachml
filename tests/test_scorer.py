@@ -1,6 +1,6 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from reachml.action_set import ActionSet
 from reachml.constraints import ThermometerEncoding
@@ -19,6 +19,7 @@ TEST_PARAMS = [
     # "joint_continuous_monotonic",
 ]
 
+
 @pytest.fixture(params=TEST_PARAMS)
 def discrete_test_case(request):
     if "separable" in request.param:
@@ -29,12 +30,10 @@ def discrete_test_case(request):
 
     return out
 
+
 def generate_discrete_separable_test_case(name):
     X1_MAX = 5
-    X = pd.DataFrame(
-        columns=["x1", "x2"], 
-        data=[[0, 0], [2, 1]]
-        )
+    X = pd.DataFrame(columns=["x1", "x2"], data=[[0, 0], [2, 1]])
     A = ActionSet(X)
     A["x1"].ub = X1_MAX
 
@@ -44,37 +43,28 @@ def generate_discrete_separable_test_case(name):
     if "immutable" in name:
         A.actionable = False
         expected_set = {
-            (0, 0): {
-                "Rj": [[], []],
-                "score": [0, 0]
-            },
-            (2, 1): {
-                "Rj": [[], []],
-                "score": [0, 0]
-            }
+            (0, 0): {"Rj": [[], []], "score": [0, 0]},
+            (2, 1): {"Rj": [[], []], "score": [0, 0]},
         }
     elif "monotonic" in name:
         A.step_direction = 1
         expected_set = {
             (0, 0): {
-                "Rj": [[[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]], [[0, 1]]], 
-                "score": [0.6, 0]
+                "Rj": [[[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]], [[0, 1]]],
+                "score": [0.6, 0],
             },
-            (2, 1): {
-                "Rj": [[[3, 1], [4, 1], [5, 1]], []],
-                "score": [1, 0]
-            }
+            (2, 1): {"Rj": [[[3, 1], [4, 1], [5, 1]], []], "score": [1, 0]},
         }
     else:
         expected_set = {
             (0, 0): {
-                "Rj": [[[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]], [[0, 1]]], 
-                "score": [0.6, 0]
+                "Rj": [[[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]], [[0, 1]]],
+                "score": [0.6, 0],
             },
             (2, 1): {
                 "Rj": [[[0, 1], [1, 1], [3, 1], [4, 1], [5, 1]], [[2, 0]]],
-                "score": [0.6, 0]
-            }
+                "score": [0.6, 0],
+            },
         }
 
     out = {
@@ -86,12 +76,18 @@ def generate_discrete_separable_test_case(name):
 
     return out
 
+
 def generate_joint_thermometer_test_case(name):
     step_direction = -1 if "monotonic" in name else 0
 
     X = pd.DataFrame(
-        columns=["CreditUtil_geq_25", "CreditUtil_geq_50", "CreditUtil_geq_75", "CreditUtil_geq_100"],
-        data=[[0, 0, 0, 0], [1, 1, 1, 1]]
+        columns=[
+            "CreditUtil_geq_25",
+            "CreditUtil_geq_50",
+            "CreditUtil_geq_75",
+            "CreditUtil_geq_100",
+        ],
+        data=[[0, 0, 0, 0], [1, 1, 1, 1]],
     )
     A = ActionSet(X)
 
@@ -103,50 +99,61 @@ def generate_joint_thermometer_test_case(name):
 
     elem_clf = lambda x: 1 if x[2] < 1 else -1
     clf = lambda x: np.array([elem_clf(xi) for xi in x])
-    
+
     if "immutable" in name:
         A.actionable = False
         expected_set = {
-            (0, 0, 0, 0): {
-                "Rj": [[], [], [], []],
-                "score": [0, 0, 0, 0]
-            },
-            (1, 1, 1, 1): {
-                "Rj": [[], [], [], []],
-                "score": [0, 0, 0, 0]
-            }
+            (0, 0, 0, 0): {"Rj": [[], [], [], []], "score": [0, 0, 0, 0]},
+            (1, 1, 1, 1): {"Rj": [[], [], [], []], "score": [0, 0, 0, 0]},
         }
 
     elif "monotonic" in name:
         expected_set = {
-            (0, 0, 0, 0): {
-                "Rj": [[], [], [], []],
-                "score": [0, 0, 0, 0]
-            },
+            (0, 0, 0, 0): {"Rj": [[], [], [], []], "score": [0, 0, 0, 0]},
             (1, 1, 1, 1): {
-                "Rj": [[[0, 0, 0, 0,]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]]], 
-                "score": [1, 1, 1, 0.75]
-            }
+                "Rj": [
+                    [
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                        ]
+                    ],
+                    [[0, 0, 0, 0], [1, 0, 0, 0]],
+                    [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]],
+                    [[1, 1, 1, 0]],
+                ],
+                "score": [1, 1, 1, 0],
+            },
         }
     else:
         expected_set = {
             (0, 0, 0, 0): {
-                "Rj": [[[1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0], [1, 1, 1, 1]],
-                       [[1, 1, 0, 0], [1, 1, 1, 0], [1, 1, 1, 1]],
-                       [[1, 1, 1, 0], [1, 1, 1, 1]],
-                       [[1, 1, 1, 1]]],
-                "score": [0.5, 1/3, 0, 0]
+                "Rj": [
+                    [[1, 0, 0, 0]],
+                    [[1, 1, 0, 0], [1, 1, 1, 0], [1, 1, 1, 1]],
+                    [[1, 1, 1, 0], [1, 1, 1, 1]],
+                    [[1, 1, 1, 1]],
+                ],
+                "score": [1, 1 / 3, 0, 0],
             },
             (1, 1, 1, 1): {
-                "Rj": [[[0, 0, 0, 0,]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]], 
-                       [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]]], 
-                "score": [1, 1, 1, 0.75]
-            }
+                "Rj": [
+                    [
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                        ]
+                    ],
+                    [[0, 0, 0, 0], [1, 0, 0, 0]],
+                    [[0, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]],
+                    [[1, 1, 1, 0]],
+                ],
+                "score": [1, 1, 1, 0],
+            },
         }
 
     out = {
@@ -155,8 +162,9 @@ def generate_joint_thermometer_test_case(name):
         "clf": clf,
         "expected_set": expected_set,
     }
-    
+
     return out
+
 
 def test_enumerating_scorer(discrete_test_case):
     X = discrete_test_case["X"]
@@ -164,14 +172,13 @@ def test_enumerating_scorer(discrete_test_case):
     clf = discrete_test_case["clf"]
     expected_set = discrete_test_case["expected_set"]
 
-    scorer = ResponsivenessScorer(
-        action_set=A,
-        method="enumerate"
-    )
+    scorer = ResponsivenessScorer(action_set=A, method="enumerate")
 
     for i, x in enumerate(X.values):
         score = scorer.score(x, clf)
         # check score
+        print(score)
+        print(expected_set[tuple(x)]["score"])
         assert np.isclose(score, expected_set[tuple(x)]["score"]).all()
 
         # check interventions
@@ -181,10 +188,12 @@ def test_enumerating_scorer(discrete_test_case):
             if inter.size == 0:
                 assert expected_set[tuple(x)]["Rj"][j] == []
             else:
+                print(x)
                 assert np.array_equal(
-                        np.sort(x + inter, axis=0), 
-                        np.array(expected_set[tuple(x)]["Rj"][j], dtype=np.float64)
-                    )
+                    np.sort(x + inter, axis=0),
+                    np.array(expected_set[tuple(x)]["Rj"][j], dtype=np.float64),
+                )
+
 
 def test_discrete_sampling(discrete_test_case):
     X = discrete_test_case["X"]
@@ -206,4 +215,7 @@ def test_discrete_sampling(discrete_test_case):
             if inter.size == 0:
                 assert expected_set[tuple(x)]["Rj"][j] == []
             else:
-                assert np.array(expected_set[tuple(x)]["Rj"][j], dtype=np.float64) in x + inter
+                assert (
+                    np.array(expected_set[tuple(x)]["Rj"][j], dtype=np.float64)
+                    in x + inter
+                )
