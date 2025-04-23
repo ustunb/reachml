@@ -20,10 +20,10 @@ from src.ext import fileutils
 from src.ext.data import BinaryClassificationDataset
 from src.ext.training import extract_predictor
 from src.paths import *
+from src.utils import check_processing_loss, tabulate_actions
 
 from reachml import ActionSet, ReachableSetDatabase
 from reachml.constraints import *
-from reachml.utils import check_processing_loss, tabulate_actions
 
 settings = {
     "data_name": "fico",

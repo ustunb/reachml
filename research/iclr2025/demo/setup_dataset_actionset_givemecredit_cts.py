@@ -20,10 +20,10 @@ pp = pprint.PrettyPrinter(depth=2)
 from src.ext import fileutils
 from src.ext.data import BinaryClassificationDataset
 from src.paths import *
+from src.utils import check_processing_loss
 
 from reachml import ActionSet
 from reachml.constraints import *
-from reachml.utils import check_processing_loss
 
 settings = {
     "data_name": "givemecredit_cts",

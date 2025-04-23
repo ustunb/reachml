@@ -1,14 +1,16 @@
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RandomizedSearchCV
-from xgboost import XGBClassifier
+import warnings
+
+import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-import numpy as np
-import warnings
-from . import metrics
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+
+from . import metrics
 
 warnings.filterwarnings("ignore")
 
@@ -39,8 +41,8 @@ PARAMS_XGB = {
     "booster": ["gbtree"],  # TreeSHAP only supports gbtree
     "subsample": np.arange(0.5, 1.1, 0.1),
     "grow_policy": ["depthwise", "lossguide"],
-    'reg_alpha': [0, 0.01, 0.1],
-    'reg_lambda': [1, 1.1, 1.2]
+    "reg_alpha": [0, 0.01, 0.1],
+    "reg_lambda": [1, 1.1, 1.2],
 }
 
 # PARAMS_XGB = {
@@ -62,7 +64,9 @@ CLF_MAP = {
 }
 
 
-def sample_processing(data, label_encoding=None, rescale=False, rebalance=None, seed=None):
+def sample_processing(
+    data, label_encoding=None, rescale=False, rebalance=None, seed=None
+):
     """
     Process training and testing data, performing optional label encoding, rescaling, and rebalancing.
 
@@ -76,7 +80,9 @@ def sample_processing(data, label_encoding=None, rescale=False, rebalance=None, 
     Returns:
         dict: Contains processed X_train, y_train, X_test, y_test, scaler, and processing parameters.
     """
-    assert rebalance in (None, "over", "under"), "rebalance must be one of None, 'over', or 'under'"
+    assert rebalance in (None, "over", "under"), (
+        "rebalance must be one of None, 'over', or 'under'"
+    )
     if label_encoding is not None:
         assert len(label_encoding) == 2, "label_encoding must have two elements"
         data.training.update_classes(values=label_encoding)
@@ -96,7 +102,11 @@ def sample_processing(data, label_encoding=None, rescale=False, rebalance=None, 
     X_valid, y_valid = data.validation.X, data.validation.y
 
     if rebalance is not None:
-        resampler = RandomOverSampler(random_state=seed) if rebalance == "over" else RandomUnderSampler(random_state=seed)
+        resampler = (
+            RandomOverSampler(random_state=seed)
+            if rebalance == "over"
+            else RandomUnderSampler(random_state=seed)
+        )
         X_train, y_train = resampler.fit_resample(X_train, y_train)
         X_test, y_test = resampler.fit_resample(X_test, y_test)
         if X_valid.shape[0] > 0:
@@ -144,7 +154,15 @@ def _build_output(processed, model, model_type):
     }
 
 
-def train_model(data, model_type, seed=None, label_encoding=None, rescale=False, rebalance=None, **kwargs):
+def train_model(
+    data,
+    model_type,
+    seed=None,
+    label_encoding=None,
+    rescale=False,
+    rebalance=None,
+    **kwargs,
+):
     """
     Train a model of the given class using randomized search for hyperparameters and wrap with a scaler if provided.
 
@@ -165,7 +183,11 @@ def train_model(data, model_type, seed=None, label_encoding=None, rescale=False,
     model_class, param_distributions = CLF_MAP[model_type]
 
     processed = sample_processing(
-        data, label_encoding=label_encoding, rescale=rescale, rebalance=rebalance, seed=seed
+        data,
+        label_encoding=label_encoding,
+        rescale=rescale,
+        rebalance=rebalance,
+        seed=seed,
     )
 
     pool = RandomizedSearchCV(
@@ -173,18 +195,24 @@ def train_model(data, model_type, seed=None, label_encoding=None, rescale=False,
         param_distributions=param_distributions,
         n_iter=10,
         cv=3,
-        verbose=3,
+        verbose=2,
         scoring="roc_auc",
         random_state=seed,
         n_jobs=-1,
     )
 
     if kwargs.get("early_stopping_rounds") is not None:
-        assert model_type == "xgb", "early_stopping_rounds only supported for XGBClassifier"
-        assert processed["X_valid"] is not None, "early_stopping_rounds requires validation data"
-        pool.set_params(estimator__early_stopping_rounds=kwargs["early_stopping_rounds"])
+        assert model_type == "xgb", (
+            "early_stopping_rounds only supported for XGBClassifier"
+        )
+        assert processed["X_valid"] is not None, (
+            "early_stopping_rounds requires validation data"
+        )
+        pool.set_params(
+            estimator__early_stopping_rounds=kwargs["early_stopping_rounds"]
+        )
         pool.fit(
-            X=processed["X_train"], 
+            X=processed["X_train"],
             y=processed["y_train"],
             eval_set=[(processed["X_valid"], processed["y_valid"])],
         )
@@ -195,10 +223,7 @@ def train_model(data, model_type, seed=None, label_encoding=None, rescale=False,
 
     # Always wrap model with scaler in a pipeline if a scaler is present.
     if processed["scaler"] is not None:
-        clf = Pipeline([
-            ("scaler", processed["scaler"]),
-            ("clf", best_estimator)
-        ])
+        clf = Pipeline([("scaler", processed["scaler"]), ("clf", best_estimator)])
     else:
         clf = best_estimator
 

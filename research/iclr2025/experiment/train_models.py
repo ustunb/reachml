@@ -1,12 +1,12 @@
-import sys
 import os
+import sys
 
 sys.path.append(os.getcwd())
-import psutil
 import argparse
-from src.paths import *
 
+import psutil
 from src.ext import fileutils, training
+from src.paths import get_data_file, get_model_file
 
 settings = {
     "data_name": "german",
@@ -38,7 +38,7 @@ if process_type not in ("pycharm"):  # add your favorite IDE process here
 if settings["model_type"] == "logreg":
     settings["rescale"] = True
 elif settings["model_type"] == "xgb":
-    settings["label_encoding"] = (0,1)
+    settings["label_encoding"] = (0, 1)
     if "givemecredit" in settings["data_name"]:
         settings["early_stopping_rounds"] = 10
         settings["fold_num_validation"] = 4
@@ -56,21 +56,3 @@ data.split(
 results = training.train_model(data, **settings)
 results = results | settings
 fileutils.save(results, path=get_model_file(**settings), overwrite=True)
-
-
-# # pick training function
-# if settings["model_type"] == "logreg":
-#     from src.ext.training import train_logreg as train_model
-# elif settings["model_type"] == "rf":
-#     from src.ext.training import train_rf as train_model
-# elif settings["model_type"] == "xgb":
-#     from src.ext.training import train_xgb as train_model
-# elif settings["model_type"] == "dnn":
-#     raise NotImplementedError()  # todo: implement
-#     from src.ext.training import train_dnn as train_model
-
-# rebalance = None if settings["data_name"] != "givemecredit" else "over"
-# results = train_model(data, seed=settings["random_seed"], rebalance=rebalance)
-# results = results | settings
-
-# fileutils.save(results, path=get_model_file(**settings), overwrite=True)

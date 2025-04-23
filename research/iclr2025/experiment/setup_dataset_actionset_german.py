@@ -18,7 +18,7 @@ from src.ext import fileutils
 from src.ext.data import BinaryClassificationDataset
 from src.ext.training import extract_predictor
 from src.paths import *
-from utils import check_processing_loss, tabulate_actions, tally
+from src.utils import check_processing_loss, tabulate_actions, tally
 
 from reachml import ActionSet, ReachableSetDatabase
 from reachml.constraints import *
