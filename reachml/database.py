@@ -11,7 +11,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 
 from .action_set import ActionSet
-from .reachable_set import EnumeratedReachableSet, ReachableSet, SampledReachableSet
+from .reachable_set import EnumeratedReachableSet, ReachableSet
 
 
 class ReachableSetDatabase:
@@ -63,8 +63,8 @@ class ReachableSetDatabase:
 
         self.RS = (
             EnumeratedReachableSet
-            if self._method == "enumerate"
-            else SampledReachableSet
+            # if self._method == "enumerate"
+            # else SampledReachableSet
         )
 
         return
@@ -86,7 +86,7 @@ class ReachableSetDatabase:
         return self._method
 
     def array_to_key(self, x: np.ndarray) -> str:
-        float_dtype = np.float16 if self._precision <= 4 else np.float32
+        float_dtype = np.float32 if self._precision <= 4 else np.float64
         b = np.array(x, dtype=float_dtype).round(self._precision).tobytes()
         return hashlib.sha256(b).hexdigest()
 
