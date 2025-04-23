@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
+
 import numpy as np
 from cplex import SparsePair
-from tqdm import tqdm
-from collections import defaultdict
 from scipy.sparse import csr_matrix
+from tqdm import tqdm
 
 from .action_set import ActionSet
 from .cplex_utils import has_solution
@@ -11,7 +12,9 @@ from .mip import EnumeratorMIP
 
 
 class ResponsivenessScorer(ABC):
-    def __new__(cls, action_set, db=None, inter=None, cnts=None, method="auto", **kwargs):
+    def __new__(
+        cls, action_set, db=None, inter=None, cnts=None, method="auto", **kwargs
+    ):
         """
         Factory method to create a ResponsivenessScorer instance
         """
@@ -31,9 +34,11 @@ class ResponsivenessScorer(ABC):
         self._db = db
         self._inter = {} if args == () else args[0]
         self._act_feats = sorted(list(action_set.actionable_features))
-        self._act_part_feats = [f for part in action_set.actionable_partition for f in part]
+        self._act_part_feats = [
+            f for part in action_set.actionable_partition for f in part
+        ]
 
-    @property   
+    @property
     def action_set(self):
         return self._action_set
 
@@ -48,7 +53,7 @@ class ResponsivenessScorer(ABC):
     @property
     def act_feats(self):
         return self._act_feats
-    
+
     @property
     def act_part_feats(self):
         return self._act_part_feats
@@ -61,7 +66,7 @@ class ResponsivenessScorer(ABC):
     def build_inter(self, x):
         pass
 
-    @abstractmethod 
+    @abstractmethod
     def _get_inter_key(self, x):
         pass
 
@@ -99,9 +104,9 @@ class ResponsivenessScorer(ABC):
         cons = cpx.linear_constraints
         # adding constraint to match action
         cons.add(
-            names=[f'match_c[{j_idx}]'],
-            lin_expr=[SparsePair(ind=[f'c[{j_idx}]'], val=[1.0])],
-            senses=['E'],
+            names=[f"match_c[{j_idx}]"],
+            lin_expr=[SparsePair(ind=[f"c[{j_idx}]"], val=[1.0])],
+            senses=["E"],
             rhs=[float(aj)],
         )
         cpx.solve()
@@ -113,10 +118,10 @@ class ResponsivenessScorer(ABC):
             aj_acts.append(acts)
 
             # TODO: check if this is what we want
-            # if sum(map(bool, acts)) == 1 or not find_all: 
+            if sum(map(bool, acts)) == 1 or not find_all:
                 # found action that only changes j
                 # means it is not necessary for other features to change
-                # break
+                break
 
             R.remove_actions([acts])
             cpx.solve()
@@ -132,6 +137,7 @@ class ResponsivenessScorer(ABC):
     def __repr__(self):
         return f"{self.__class__.__name__}"
 
+
 class EnumeratingScorer(ResponsivenessScorer):
     def __init__(self, action_set, db=None, *args, **kwargs):
         super().__init__(action_set, db, *args, **kwargs)
@@ -140,11 +146,11 @@ class EnumeratingScorer(ResponsivenessScorer):
     @property
     def db(self):
         return self._db
-    
+
     @property
     def method(self):
         return self._method
-    
+
     @method.setter
     def method(self, value):
         assert value in ["enumerate", "filter"]
@@ -169,7 +175,7 @@ class EnumeratingScorer(ResponsivenessScorer):
 
         for j, interv_1D in x_inter.items():
             n_interv = interv_1D.shape[0]
-            
+
             if interv_1D.size == 0:  # no actions
                 score_out[j] = 0
                 continue
@@ -238,7 +244,7 @@ class EnumeratingScorer(ResponsivenessScorer):
         min_size = np.where(set_size == set_size.min())[0]
 
         return np.vstack(marg_acts)[min_size]
-    
+
     def _enumerate_1D(self, x, j, actions=True):
         """ """
         aj_lst = self.action_set[j].reachable_grid(x[j], return_actions=True)
@@ -280,8 +286,10 @@ class SamplingScorer(ResponsivenessScorer):
             all_inter_cnt = self._samp_cnts[key][j]
 
             if isinstance(all_inter_cnt, np.int32):
-                all_inter_cnt = np.ones(all_inter.shape[0], dtype=np.int32) * all_inter_cnt
-            
+                all_inter_cnt = (
+                    np.ones(all_inter.shape[0], dtype=np.int32) * all_inter_cnt
+                )
+
             xp = x + all_inter
             yp = pred_f(xp)
             eq_target = (yp == target).astype(int)
@@ -304,25 +312,23 @@ class SamplingScorer(ResponsivenessScorer):
                 act_out = csr_matrix(act_out)
                 if (cnt_out == cnt_out[0]).all():
                     cnt_out = cnt_out[0]
-                    
+
             actions[j], cnts[j] = act_out, cnt_out
 
         self._inter[key] = actions
         self._samp_cnts[key] = cnts
 
     def _sample_1D(self, x, j, n=500, actions=True):
-        """
-        """
+        """ """
         if self.action_set[j].discrete:
             return self._sample_discrete(x, j, n, actions)
         return self._sample_continuous(x, j, n, actions)
-            
+
     def _sample_continuous(self, x, j, n=500, actions=True):
-        """
-        """
+        """ """
         low = self.action_set[j].get_action_bound(x[j], bound_type="lb")
         high = self.action_set[j].get_action_bound(x[j], bound_type="ub")
-        
+
         if low == high:
             return np.array([]), []
 
@@ -334,7 +340,7 @@ class SamplingScorer(ResponsivenessScorer):
 
             for aj, n_aj in zip(aj_uni, cnt):
                 aj_acts = self._find_actions(x, aj, j, find_all=False)
-                
+
                 if aj_acts.shape[0] > 0:
                     act_dict[aj] = aj_acts
                     cnt_dict[aj] += n_aj
@@ -342,12 +348,11 @@ class SamplingScorer(ResponsivenessScorer):
 
         out_act = np.vstack(list(act_dict.values()), dtype=np.float32)
         out_cnt = np.array(list(cnt_dict.values()), dtype=np.int32)
-        
+
         return out_act, out_cnt
 
     def _sample_discrete(self, x, j, n=500, actions=True):
-        """
-        """
+        """ """
         act_grid = self.action_set[j].reachable_grid(x[j], return_actions=True)
         non_zero_acts = act_grid[act_grid != 0]
 
@@ -364,14 +369,14 @@ class SamplingScorer(ResponsivenessScorer):
 
             for aj, n_aj in zip(aj_uni, cnt):
                 aj_acts = self._find_actions(x, aj, j, find_all=False)
-                
+
                 if aj_acts.shape[0] == 0:
                     remove.append(aj)
                 else:
                     act_dict[aj] = aj_acts
                     cnt_dict[aj] += n_aj
                     samp_remain -= n_aj
-        
+
         out_act = np.vstack(list(act_dict.values()), dtype=np.float32)
         out_cnt = np.array(list(cnt_dict.values()), dtype=np.int32)
 
