@@ -1,16 +1,14 @@
 import itertools
 import os
 import sys
+
 import psutil
-import rich
 
 sys.path.append(os.getcwd())
 
-import numpy as np
-import pandas as pd
 import argparse
-from tqdm.auto import tqdm
-from reach.reachml import ReachableSetDatabase
+
+import pandas as pd
 
 settings = {
     "data_name": "german",
@@ -36,8 +34,8 @@ if process_type not in ("pycharm"):
     settings.update(vars(args))
     data_names = args.data_name
 
-from src.paths import *
 from src.ext import fileutils
+from src.paths import *
 
 data_chunks = []
 

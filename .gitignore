@@ -1,3 +1,7 @@
+# VSCode
+.devcontainer/
+compose.yml
+
 # PyCharm
 .idea/
 .RData

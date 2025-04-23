@@ -8,21 +8,22 @@ import sys
 sys.path.append(os.getcwd())
 import numpy as np
 import pandas as pd
+
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 
 import pprint
+
 pp = pprint.PrettyPrinter(depth=2)
 
-from src.paths import *
-
-from reach.reachml import ActionSet, ReachableSetDatabase
-from reach.reachml.constraints import *
 from src.ext import fileutils
 from src.ext.data import BinaryClassificationDataset
-from src.ext.training import extract_predictor
-from reach.reachml.utils import check_processing_loss, tabulate_actions
+from src.paths import *
+
+from reachml import ActionSet
+from reachml.constraints import *
+from reachml.utils import check_processing_loss
 
 settings = {
     "data_name": "givemecredit_cts",

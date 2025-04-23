@@ -1,16 +1,16 @@
 import os
 import sys
+
 import psutil
-import rich
 
 sys.path.append(os.getcwd())
 
-import numpy as np
-import pandas as pd
 import argparse
+
+import numpy as np
 from tqdm.auto import tqdm
-from reach.reachml import ReachableSetDatabase
-from reach.reachml.scoring import ResponsivenessScorer
+
+from reachml import ReachableSetDatabase
 
 DB_ACTION_SET_NAME = "complex_nD"
 
@@ -30,17 +30,20 @@ if process_type not in ("pycharm"):
     args, _ = parser.parse_known_args()
     settings.update(vars(args))
 
-from src.paths import *
 from src.ext import fileutils
+from src.paths import *
 
 # load action set and processed data
 data = fileutils.load(get_data_file(**settings))
 action_set = fileutils.load(get_action_set_file(**settings))
 
 # load database
-db = ReachableSetDatabase(action_set=action_set, path=get_reachable_db_file(
-    data_name=settings["data_name"], action_set_name=DB_ACTION_SET_NAME
-))
+db = ReachableSetDatabase(
+    action_set=action_set,
+    path=get_reachable_db_file(
+        data_name=settings["data_name"], action_set_name=DB_ACTION_SET_NAME
+    ),
+)
 
 # load processed model
 model_results = fileutils.load(get_model_file(**settings))
@@ -52,7 +55,9 @@ nan_action = np.repeat(np.nan, data.d)
 results = {}
 predictions = clf.predict(data.U)
 
-for idx, (x, y, fx) in tqdm(list(enumerate(zip(data.U, data.y[data.u_idx], predictions)))):
+for idx, (x, y, fx) in tqdm(
+    list(enumerate(zip(data.U, data.y[data.u_idx], predictions)))
+):
     # pull reachable set
     R = db[x]
     flipped_idx = np.flatnonzero(clf.predict(R.actions + x) != fx)

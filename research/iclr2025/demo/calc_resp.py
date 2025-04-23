@@ -1,15 +1,17 @@
-from psutil import Process
-from argparse import ArgumentParser
-import sys
 import os
-import pandas as pd
+import sys
+from argparse import ArgumentParser
+
 import numpy as np
+import pandas as pd
+from psutil import Process
 
 sys.path.append(os.getcwd())
 
-from src.paths import *
-from reach.reachml.scoring import ResponsivenessScorer
 from src.ext import fileutils
+from src.paths import *
+
+from reachml.scoring import ResponsivenessScorer
 
 DB_ACTION_SET_NAME = "complex_nD"
 TARGET = 1
@@ -19,7 +21,7 @@ settings = {
     "action_set_name": "complex_nD",
     "model_type": "xgb",
     "overwrite": False,
-    }
+}
 
 # parse arguments when script is run from Terminal / not iPython console
 if Process(pid=os.getppid()).name() not in ("pycharm"):
@@ -35,7 +37,7 @@ if Process(pid=os.getppid()).name() not in ("pycharm"):
 data = fileutils.load(get_data_file(**settings))
 action_set = fileutils.load(get_action_set_file(**settings))
 model = fileutils.load(get_model_file(**settings))
-clf = model['model']
+clf = model["model"]
 
 act_feats = np.array(list(action_set.actionable_features))
 act_feats.sort()
@@ -54,8 +56,14 @@ resp_out = resp_sc(data.U[neg_pred_idx], clf)
 resp_act_feat = resp_out[:, act_feats]
 row_df = pd.DataFrame(resp_act_feat, columns=act_feats)
 resp_df = row_df.melt(ignore_index=False).reset_index()
-resp_df.columns = ['u_index', 'feature', 'resp']
+resp_df.columns = ["u_index", "feature", "resp"]
 resp_df.sort_values(by=["u_index", "feature"], inplace=True)
 
 fileutils.save(resp_df, path=get_resp_df_file(**settings), overwrite=True)
-fileutils.save(resp_sc, get_scorer_file(**settings), overwrite=True, check_save=False, compress=True)
+fileutils.save(
+    resp_sc,
+    get_scorer_file(**settings),
+    overwrite=True,
+    check_save=False,
+    compress=True,
+)

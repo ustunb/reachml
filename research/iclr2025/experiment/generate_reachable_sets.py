@@ -1,14 +1,15 @@
-import sys
 import os
-from psutil import Process
+import sys
 from argparse import ArgumentParser
 
+from psutil import Process
+
 # script / source code imports
-sys.path.append(os.getcwd()) # add repo dir to path to import source code
+sys.path.append(os.getcwd())  # add repo dir to path to import source code
+from src.ext import fileutils
 from src.paths import *
 
-from src.ext import fileutils
-from reach.reachml import ReachableSetDatabase
+from reachml import ReachableSetDatabase
 
 # script settings / default command line arguments
 settings = {
@@ -16,7 +17,7 @@ settings = {
     "action_set_name": "complex_nD",
     "hard_cap": None,
     "overwrite": True,
-    "n": 500
+    "n": 500,
 }
 
 # parse settings from command line when script is not run from iPython console
