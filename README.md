@@ -3,6 +3,7 @@
 [![python](https://img.shields.io/badge/Python-3.10-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2308.12820-b31b1b.svg)](https://arxiv.org/abs/2308.12820)
+[![arXiv](https://img.shields.io/badge/arXiv-2410.22598-b31b1b.svg)](https://arxiv.org/abs/2410.22598)
 [![CI](https://github.com/ustunb/reachml/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/ci.yml)
 
 `reachml` is a library for recourse verification.
@@ -85,7 +86,7 @@ If you use responsiveness scores in your research, we would appreciate a citatio
 }
 ```
 
-The code for the paper is available under [research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/).
+The code for the paper is available under [research/iclr2025](https://github.com/ustunb/reachml/tree/main/research/iclr2025/).
 
 
 
