@@ -40,7 +40,8 @@ class ReachabilityConstraint(ActionabilityConstraint):
         # names, values, reachability = self.sort_parameters(names, values, reachability)
         self._values = values
         self._reachability = reachability
-        self._parameters = ('values', 'reachability')
+        # self._parameters = ('values', 'reachability')
+        self._parameters = ('names', 'values', 'reachability')
         super().__init__(names, parent)
 
     @property

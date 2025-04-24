@@ -11,6 +11,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from reachml import *
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.thermometer import ThermometerEncoding
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
@@ -115,11 +116,11 @@ def test_enumeration_with_thermometer_constraints(step_direction, drop_invalid):
 
         if (value_is_valid == False) and (drop_invalid == True):
             with pytest.raises(AssertionError):
-                ReachableSetEnumerator(x=x, action_set=A)
+                EnumeratedReachableSet(x=x, action_set=A).generator
 
         if (value_is_valid == True) or (drop_invalid == False):
-            enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            reachable_set = enumerator.enumerate()
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set.generate()
             assert reachable_set.complete
             assert np.array_equal(np.sort(reachable_set.X, axis=0), expected_set)
             # print(f'reachable_set.X: {reachable_set.X}')

@@ -18,9 +18,78 @@ You can install the library as follows:
 pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ```
 
-Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/risk-slim/blob/master/docs/cplex_instructions.md).
+Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/docs/cplex_instructions.md).
 
-## Quickstart
+
+## Responsiveness Scores Quickstart
+
+The following example shows how to generate responsivneess scores using `ResponsivenessScorer`.
+
+```python
+import numpy as np
+import xgboost
+
+import reachml
+
+# load dataset and train xgboost classifier
+X, y = reachml.datasets.givemecredit_cts_slim(label=[0, 1])
+model = xgboost.XGBClassifier().fit(X, y)
+
+# create simple action set
+A = reachml.ActionSet(X)
+
+# Immutable features
+A["HistoryOfDelinquency"].actionable = False
+A["HistoryOfLatePayment"].actionable = False
+
+# MonthlyIncome can change +- 5000
+A["MonthlyIncome"].step_ub = 5000
+A["MonthlyIncome"].step_lb = -5000
+
+# CreditLineUtilization can change +- 1
+A["CreditLineUtilization"].step_ub = -1
+A["CreditLineUtilization"].step_lb = 1
+
+# Min CreditLineUtilization is 0
+A["CreditLineUtilization"].lb = 0
+
+# Calculate responsiveness scores
+# Since some features are continuous, we set sample size: n = 100
+scorer = reachml.ResponsivenessScorer(A)
+scores = scorer(X, model, n=100)
+
+# List of adverse outcome indices
+rejected = np.where(model.predict(X) == 0)[0]
+
+# Plot output (pass in index)
+scorer.plot(x_idx=rejected[0])
+```
+<p align="center">
+  <img width="616" src="./docs/figures/resp_demo.png" />
+</p>
+
+### Resources and Citation
+
+For more about responsiveness scores, check out our paper ICLR 2025 paper: [Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse](https://openreview.net/forum?id=wsWCVrH9dv)
+
+If you use responsiveness scores in your research, we would appreciate a citation:
+
+```
+@inproceedings{
+    cheon2025feature,
+    title={Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse},
+    author={Seung Hyun Cheon and Anneke Wernerfelt and Sorelle Friedler and Berk Ustun},
+    booktitle={The Thirteenth International Conference on Learning Representations},
+    year={2025},
+    url={https://openreview.net/forum?id=wsWCVrH9dv}
+}
+```
+
+The code for the paper is available under [research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/).
+
+
+
+## Reachable Sets Quickstart
 
 The following example shows how to specify actionability constraints using `ActionSet` and to build a database of `ReachableSet` for each point.
 
@@ -108,7 +177,7 @@ script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/se
 
 For more about recourse verification, check out our paper ICLR 2024 spotlight paper: [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
 
-If you use this library in your research, we would appreciate a citation:
+If you use recourse verification in your research, we would appreciate a citation:
 ```
 @inproceedings{kothari2024prediction,
     title={Prediction without Preclusion: Recourse Verification with Reachable Sets},

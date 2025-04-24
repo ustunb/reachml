@@ -1,14 +1,15 @@
 from abc import ABC
-import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Union
+
+import numpy as np
 
 
 @dataclass
 class ActionElement:
     name: str = field(init=True)
-    lb: float = field(repr=True)
-    ub: float = field(repr=True)
+    lb: float = field(repr=True, default=-float("inf"))
+    ub: float = field(repr=True, default=float("inf"))
     actionable: Optional[bool] = field(init=False, default=True, repr=True)
     step_direction: Union[int, float] = field(init=False, default=0, repr=True)
     step_ub: float = field(init=False, default=float("inf"), repr=True)
@@ -70,6 +71,23 @@ class FloatActionElement(ActionElement, ABC):
     variable_type: type = float
     step_size: float = field(init=False, default=1e-4, repr=False)
 
+    def feasible_bound(self, x, return_actions=False):
+        """
+        Get the feasible bounds for the action element
+
+        :returns: tuple of feasible (lb, ub). If return_actions then returns (x-lb, ub-x)
+        """
+        a_lb = self.get_action_bound(x, "lb")
+        a_ub = self.get_action_bound(x, "ub")
+
+        if return_actions:
+            return a_lb, a_ub
+
+        lb = x + a_lb
+        ub = x + a_ub
+
+        return lb, ub
+
 
 @dataclass
 class IntegerActionElement(ActionElement, ABC):
@@ -111,6 +129,7 @@ class BooleanActionElement(IntegerActionElement, ABC):
     ub: bool = field(default=True, init=False)
     variable_type: type = bool
     step_size: 1 = field(init=False, repr=False)
+    discrete: bool = True
 
     @property
     def grid(self):

@@ -1,11 +1,17 @@
+from abc import ABC, abstractmethod
 from typing import Optional, Union
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from .action_set import ActionSet
+from .enumeration import ReachableSetEnumerator
+
+# default threshold
+THRESH = 0.1
 
 
-class ReachableSet(object):
+class ReachableSet(ABC):
     """
     Class to represent or manipulate a reachable set over a discrete feature space
     """
@@ -30,11 +36,6 @@ class ReachableSet(object):
         :param initialize_from_actions: set to True if values that we pass are actions
         """
 
-        self._action_set = action_set
-        self._complete = complete
-        # TODO: Is this correct?
-        # assert len(action_set) == len(x)
-
         if x is None:
             if initialize_from_actions:
                 raise ValueError(
@@ -47,17 +48,11 @@ class ReachableSet(object):
             else:
                 x = values[0].flatten()
 
+        self._action_set = action_set
+        self._complete = complete
         self._x = x
-        self._X = np.array(x).reshape((1, self.d))
-        if self.discrete:
-            self.has_feature_vector = lambda x: np.all(self._X == x, axis=1).any()
-        else:
-            self.has_feature_vector = (
-                lambda x: np.isclose(self._X, x, atol=self._TOLERANCE).all(axis=1).any()
-            )
-
-        if values is not None:
-            self.add(values=values, actions=initialize_from_actions, **kwargs)
+        self._generator = None
+        self._time = kwargs.get("time", None)
 
     @property
     def action_set(self):
@@ -73,6 +68,10 @@ class ReachableSet(object):
     def x(self):
         """return source point"""
         return self._x
+
+    @x.setter
+    def x(self, value):
+        self._x = value
 
     @property
     def d(self):
@@ -95,9 +94,61 @@ class ReachableSet(object):
         return self._complete
 
     @property
+    def time(self) -> Optional[float]:
+        """returns time taken to generate reachable set"""
+        return self._time
+
+    @property
     def fixed(self) -> bool:
         """returns True if fixed point"""
         return len(self) == 1 and self._complete
+
+    @property
+    def generator(self):
+        """returns generator"""
+        if self._generator is None:
+            self._generator = self._initialize_generator()
+
+        return self._generator
+
+    @abstractmethod
+    def generate(self, **kwargs):
+        """generate reachable set, points are stored in self.X"""
+        pass
+
+    @abstractmethod
+    def _initialize_generator(self):
+        """initialize generator"""
+        pass
+
+    def extract(self, other):
+        """extract points from another reachable set"""
+        raise NotImplementedError()
+
+    def find(self, clf, target):
+        """
+        :param clf: classifier with a predict function
+        :param target: float/int that attains a target class, or array-like or target classes
+        :return: first reachable point that attains a target prediction from the classifier
+        """
+        # check that clf has a predict function
+        assert hasattr(clf, "predict")
+
+        if not isinstance(target, (list, tuple)):
+            target = np.float(target)
+
+        # todo: check that target classes are in classifier.classes
+        # todo: optimize for loop using e.g. numba or using the size of X
+        out = (False, None)
+        for x in self.X:
+            if clf.predict(x) in target:
+                out = (True, x)
+                break
+        return out
+
+    def reset(self):
+        """reset reachable set"""
+        self._complete = False
 
     def __getitem__(self, i: int) -> np.ndarray:
         return self._X[i]
@@ -136,87 +187,71 @@ class ReachableSet(object):
         )
         return out
 
-    def scores(
+    def __add__(self, other):
+        """add two reachable sets together"""
+        raise NotImplementedError()
+        assert isinstance(other, ReachableSet)
+        # todo: check that reachable sets are compatible
+
+    def __len__(self) -> int:
+        """returns number of points in the reachable set, including the original point"""
+        return self._X.shape[0]
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}<n={len(self)}, complete={bool(self._complete)}>"
+
+    def _get_metadata(self) -> pd.Series:
+        metadata = pd.Series(dict(complete=self._complete))
+        assert all(metadata.index == ReachableSet._METADATA_KEYS)
+        return metadata
+
+
+class EnumeratedReachableSet(ReachableSet):
+    """
+    Class to represent or manipulate a reachable set over a discrete feature space
+    """
+
+    def __init__(
         self,
-        point_mask=None,
-        feature_mask=None,
-        max_score=None,
-        weigh_changes=False,
-        invert=False,  # ,ignore_downstream_effects = False,
+        action_set: ActionSet,
+        x: Optional[np.ndarray] = None,
+        complete: bool = False,
+        values: Optional[np.ndarray] = None,
+        initialize_from_actions: bool = False,
+        **kwargs,
     ):
         """
-        computes reachability scores across features.
-            r[j] = {% of points in reachable_set that can be reached by changes in feature j}
-        :param point_mask: boolean array to select subset of points (e.g., points with recourse)
-        :param feature_mask: boolean array to select subset of features (e.g., mutable features)
-        :param max_score: normalization factor -- use to normalize across subpopulations
-        :param invert: returns a mutability score -- {% of points in reachable set that remain the same}
-        :return:
+        :param action_set: action set
+        :param x: source point
         """
-        if feature_mask is None:
-            R = self._X
-            x = self._x
+        super().__init__(
+            action_set=action_set, x=x, complete=complete, values=values, **kwargs
+        )
+        self._X = np.array(x).reshape((1, self.d))
+
+        if self.discrete:
+            self.has_feature_vector = lambda x: np.all(self._X == x, axis=1).any()
         else:
-            R = self._X[:, feature_mask]
-            x = self._x[feature_mask]
-
-        if R.shape[0] == 1 or (point_mask is not None and not any(point_mask)):
-            return np.zeros_like(x)
-
-        if point_mask is not None:
-            R = R[point_mask, :]
-
-        # score computation
-        if invert:
-            changes = np.equal(R, x)
-        else:
-            changes = np.not_equal(R, x)
-
-        if weigh_changes:
-            weights = np.sum(changes, axis=1)
-            keep = weights > 0
-            if not any(keep):
-                return np.zeros_like(x)
-            scores = np.dot(1.0 / weights[keep], changes[keep, :])
-        else:
-            scores = np.sum(changes, axis=0)
-
-        if max_score is not None:
-            scores = scores / max_score
-        return scores
-
-    def describe(self, predictor=None, target=None):
-        """
-        describes predictions by features
-            r[j] = {% of points in reachable_set that can be reached by changes in feature j}
-        :param predictor: prediction handle that can can take ReachableSet.X as input e.g.,
-               lambda x: clf.predict(x)
-        :param target: target prediction
-        :param max_score: normalization factor -- use to normalize across subpopulations
-        :param invert: returns a mutability score -- {% of points in reachable set that remain the same}
-        :return:
-        """
-        if predictor is None:
-            df = pd.DataFrame(
-                index=self.action_set.names,
-                data={
-                    "x": self._x,
-                    "n_total": np.not_equal(self._X, self._x).sum(axis=0),
-                },
+            self.has_feature_vector = (
+                lambda x: np.isclose(self._X, x, atol=self._TOLERANCE).all(axis=1).any()
             )
-        else:
-            assert target is not None
-            changes = np.not_equal(self._X, self._x)
-            idx = np.equal(predictor(self._X), target)
-            df = pd.DataFrame(
-                index=self.action_set.names,
-                data={
-                    "x": self._x,
-                    "n_total": np.sum(changes, axis=0),
-                    "n_target": np.sum(changes[idx], axis=0),
-                },
-            )
-        return df
+
+        if values is not None:
+            self.add(values=values, actions=initialize_from_actions, **kwargs)
+
+    def _initialize_generator(self):
+        """initialize generator"""
+        return ReachableSetEnumerator(action_set=self.action_set, x=self.x)
+
+    def generate(self, **kwargs):
+        """generate reachable set using enumeration"""
+        self.generator.enumerate(**kwargs)
+        vals = self.generator.feasible_actions
+
+        self.add(values=vals, actions=True)
+        self._complete = True
+
+        return len(vals)
 
     def add(
         self,
@@ -224,6 +259,7 @@ class ReachableSet(object):
         actions: bool = False,
         check_distinct: bool = True,
         check_exists: bool = True,
+        **kwargs,
     ):
         """
         :param values: array-like -- feature vectors / to add
@@ -253,46 +289,7 @@ class ReachableSet(object):
         out = values.shape[0]
         return out
 
-    def find(self, clf, target):
-        """
-        :param clf: classifier with a predict function
-        :param target: float/int that attains a target class, or array-like or target classes
-        :return: first reachable point that attains a target prediction from the classifier
-        """
-        # todo: check that clf has a predict function
-        if not isinstance(target, (list, tuple)):
-            target = np.float(target)
-
-        # todo: check that target classes are in classifier.classes
-        # todo: optimize for loop using e.g. numba or using the size of X
-        out = (False, None)
-        for x in self.X:
-            if clf.predict(x) in target:
-                out = (True, x)
-                break
-        return out
-
-    def __len__(self) -> int:
-        """returns number of points in the reachable set, including the original point"""
-        return self._X.shape[0]
-
-    def __repr__(self) -> str:
-        return f"<ReachableSet<n={len(self)}, complete={self._complete}>"
-
-    def extract(self, other):
-        """extract points from another reachable set"""
-        raise NotImplementedError()
-        assert isinstance(other, ReachableSet)
-        # todo: check compatibility
-        return out
-
-    def __add__(self, other):
-        """add two reachable sets together"""
-        raise NotImplementedError()
-        assert isinstance(other, ReachableSet)
-        # todo: check that reachable sets are compatible
-
-    def _get_metadata(self) -> pd.Series:
-        metadata = pd.Series(dict(complete=self._complete))
-        assert metadata.index == self._METADATA_KEYS
-        return metadata
+    def reset(self):
+        """reset reachable set"""
+        super().reset()
+        self._X = np.array(self.x).reshape((1, self.d))

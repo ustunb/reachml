@@ -2,19 +2,10 @@
 This file contains fixtures to create datasets and action sets for testing enumeration
 """
 
-import os
 import pytest
-import pathlib
 import numpy as np
 import pandas as pd
 from reachml.action_set import ActionSet
-
-
-@pytest.fixture
-def credit_data():
-    tests_dir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
-    return pd.read_csv(tests_dir / "fixtures/credit.csv")
-
 
 BOOLEAN_TEST_CASES_1D = [
     "boolean_1d",
@@ -61,7 +52,7 @@ SEPARABLE_TEST_CASES_2D = SEPARABLE_BOOLEAN_TEST_CASES_2D
 
 
 @pytest.fixture(params=SEPARABLE_TEST_CASES)
-def test_case(request):
+def discrete_test_case(request):
     name = request.param
     if "1d" in name:
         out = generate_1d_test_case(name)

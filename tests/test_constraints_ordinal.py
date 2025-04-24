@@ -2,11 +2,11 @@
 Test Strategy
 todo
 """
-
 import pytest
 import pandas as pd
 import numpy as np
 from reachml import *
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.ordinal import OrdinalEncoding
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
@@ -127,16 +127,10 @@ def test_enumeration_with_ordinal_constraints(exhaustive, step_direction):
     for idx, x in enumerate(all_values):
         expected_set = test_case["expected_sets"].get(tuple(x))
         if constraint.check_encoding(x):
-            enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            reachable_set = enumerator.enumerate()
-            # print(f'\n')
-            # print(f'\nvalues\n{constraint.values}')
-            # print(f'\nreachability\n{constraint.reachability}')
-            # print(f'\nx\n{x}')
-            # print(f'\nreachable_set.X\n{reachable_set.X}')
-            # print(f'\nexpected_set.X\n{expected_set}')
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set.generate()
             assert reachable_set.complete
             assert np.array_equal(sortrows(reachable_set.X), expected_set)
         else:
             with pytest.raises(AssertionError):
-                ReachableSetEnumerator(x=x, action_set=A)
+                EnumeratedReachableSet(x=x, action_set=A).generate()

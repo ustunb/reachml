@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from reachml.enumeration import ReachableSetEnumerator
+from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints import *
 
 
@@ -9,24 +9,21 @@ def vacuous_reachability_constraint(request):
     return request
 
 
-def test_enumeration(test_case, vacuous_reachability_constraint):
-    X = test_case["X"]
-    A = test_case["A"]
+def test_enumeration(discrete_test_case, vacuous_reachability_constraint):
+    X = discrete_test_case["X"]
+    A = discrete_test_case["A"]
     print(f"X: {X}")
     print(f"A: {A}")
 
-    expected_reachable_set = test_case["R"]
+    expected_reachable_set = discrete_test_case["R"]
     for x in X.values:
         x = np.array(x, dtype=int).tolist()
-        enumerator = ReachableSetEnumerator(x=x, action_set=A)
+        reachable_set = EnumeratedReachableSet(action_set=A, x=x)
         R = expected_reachable_set.get(tuple(x))
         n_expected = len(R)
         for k in range(0, n_expected):
-            reachable_set = enumerator.enumerate(max_points=1)
+            reachable_set.generate(max_points=1)
             assert reachable_set.complete is False or len(reachable_set) == n_expected
-            # print(reachable_set)
-            # print(f'reachable_set.x = {reachable_set.x}')
-            # print(f'reachable_set.X = {reachable_set.X}')
 
         # reachable set should be complete
         assert reachable_set.complete
@@ -35,7 +32,7 @@ def test_enumeration(test_case, vacuous_reachability_constraint):
             assert np.all(reachable_set.X == xr, axis=1).any()
 
         # calling enumerate should not change anything
-        reachable_set = enumerator.enumerate(max_points=1)
+        reachable_set.generate(max_points=1)
         assert len(reachable_set) == n_expected
         for xr in R:
             assert np.all(reachable_set.X == xr, axis=1).any()
@@ -45,8 +42,8 @@ def test_enumeration(test_case, vacuous_reachability_constraint):
             const_id = A.constraints.add(
                 ReachabilityConstraint(names=X.columns.tolist(), values=reachable_set.X)
             )
-            constrained_enumerator = ReachableSetEnumerator(x=x, action_set=A)
-            constrained_reachable_set = constrained_enumerator.enumerate()
+            constrained_reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            constrained_reachable_set.generate()
             assert reachable_set == constrained_reachable_set
             A.constraints.drop(const_id)
 

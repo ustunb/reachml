@@ -1,17 +1,19 @@
-import os
 import pathlib
+
 import numpy as np
 import pytest
-import pandas as pd
-from reachml import database
+
+import reachml
+from reachml import ReachableSetDatabase
 from reachml.action_set import ActionSet
-from reachml.database import ReachableSetDatabase
 
 
 @pytest.fixture()
-def test_case(credit_data):
+def test_case():
     names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
-    X = credit_data[names]
+    # X = pd.read_csv(tests_dir / "credit.csv")[names]
+    X, _ = reachml.datasets.credit()
+    X = X[names]
 
     A = ActionSet(X)
 
@@ -23,19 +25,19 @@ def test_case(credit_data):
 precision = ReachableSetDatabase._PRECISION
 
 
-def test_content_addressable_encoding_integer():
+def test_content_addressable_encoding_integer(test_case):
     x1 = np.array([1, 2, 3])
     x2 = np.array([1, 2, 3], dtype=np.float32)
-    key1 = database._array_to_key(x1, precision=precision)
-    key2 = database._array_to_key(x2, precision=precision)
+    key1 = ReachableSetDatabase(test_case["A"], precision=precision).array_to_key(x1)
+    key2 = ReachableSetDatabase(test_case["A"], precision=precision).array_to_key(x2)
     assert key1 == key2
 
 
-def test_content_addressable_encoding_float():
+def test_content_addressable_encoding_float(test_case):
     x1 = np.array([0.1, 0.2, 0.3])
     x2 = np.array([0.10000002, 0.2, 0.3])
-    key1 = database._array_to_key(x1, precision=precision)
-    key2 = database._array_to_key(x2, precision=precision)
+    key1 = ReachableSetDatabase(test_case["A"], precision=precision).array_to_key(x1)
+    key2 = ReachableSetDatabase(test_case["A"], precision=precision).array_to_key(x2)
     assert key1 == key2
 
 

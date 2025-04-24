@@ -1,48 +1,37 @@
-[tool.poetry]
+[project]
 name = "reachml"
-version = "0.1.0"
+version = "0.2.0"
 description = "Recourse verification with reachable sets"
-authors = ["Berk Ustun <berk@ucsd.edu>",
-           "Bogdan Kulynych <bogdan@kulyny.ch>",
-           "Avni Kothari <akothari@ucsd.edu>"]
+authors = [
+  { name = "Berk Ustun", email = "berk@ucsd.edu" },
+  { name = "Bogdan Kulynych",   email = "bogdan@kulyny.ch" },
+  { name = "Avni Kothrai",   email = "akothari@ucsd.edu" },
+  { name = "Seung Hyun Cheon", email = "scheon@ucsd.edu" },
+]
 license = "MIT"
 readme = "README.md"
+requires-python = ">=3.10,<3.11"
 
-[tool.poetry.dependencies]
-python = "^3.10"
-numpy = "^1.26.4"
-pandas = "^2.2.2"
-tqdm = "^4.66.4"
-prettytable = "^3.10.0"
-h5py = "^3.11.0"
-cplex = { version = "^22.1.1.2", optional = true }
+dependencies = [
+  "numpy~=2.1.3",
+  "pandas~=2.2.3",
+  "tqdm~=4.67.1",
+  "prettytable~=3.14.0",
+  "h5py~=3.12.1",
+  "matplotlib~=3.10.0"
+]
 
-[tool.poetry.extras]
-cplex = ["cplex"]
-
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-ipdb = "^0.13.13"
-pytest = "^8.2.0"
-
-[tool.poetry.group.iclr2024]
-optional = true
-
-[tool.poetry.group.iclr2024.dependencies]
-pytest = "^8.2.0"
-jupyter = "^1.0.0"
-seaborn = "^0.13.2"
-matplotlib = "^3.8.4"
-xgboost = "^2.0.3"
-scikit-learn = "^1.4.2"
-imblearn = "^0.0"
-dill = "^0.3.8"
-ipdb = "^0.13.13"
-rich = "^13.7.1"
-recourse = "1.0.0"
+[project.optional-dependencies]
+cplex   = [ "cplex~=22.1.1.0" ]
+explain = [ "lime~=0.2.0", "shap~=0.46.0" ]
+recourse = [ "recourse~=1.0.0", "dice-ml~=0.9" ]
+dev     = [
+  "ipdb~=0.13.13", "pytest~=8.3.4", "jupyter~=1.1.1",
+  "scikit-learn==1.5.2", "xgboost==2.1.4", "imbalanced-learn~=0.13.0",
+  "dill==0.3.9", "rich~=13.9.4", "pypdf2~=3.0.1",
+  "psutil~=6.1.1", "matplotlib~=3.10.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
