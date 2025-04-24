@@ -2,19 +2,21 @@
 Test Strategy
 todo
 """
-import pytest
-import pandas as pd
+
 import numpy as np
-from reachml.paths import tests_dir
-from reachml import *
-from reachml.reachable_set import EnumeratedReachableSet
+import pandas as pd
+import pytest
+
+import reachml
+from reachml import ActionSet
 from reachml.constraints.onehot import OneHotEncoding
+from reachml.reachable_set import EnumeratedReachableSet
 
 
 @pytest.fixture(params=["credit_onehot", "credit_onehot_all_immutable"])
 def test_case(request):
     if "credit_onehot" in request.param:
-        X = pd.read_csv(tests_dir / "credit.csv")
+        X, _ = reachml.datasets.credit()
         names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
 
     A = ActionSet(X)
@@ -142,9 +144,7 @@ def test_enumeration_with_onehot_constraints_overlapping():
         reachable_set = EnumeratedReachableSet(x=x, action_set=A)
         reachable_set.generate()
         assert np.equal(np.sum(reachable_set.X[:, SA], axis=1), 1.0).all()
-        assert np.less_equal(
-            np.sum(reachable_set.X[:, SB], axis=1), 2.0
-        ).all()
+        assert np.less_equal(np.sum(reachable_set.X[:, SB], axis=1), 2.0).all()
 
 
 @pytest.mark.parametrize("limit_value,limit_type", [(1, "equal"), (1, "max")])

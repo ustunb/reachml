@@ -15,3 +15,11 @@ def givemecredit_cts_slim(n=100, label=[-1, 1]):
     X, y = data_df.iloc[:, 1:], data_df.iloc[:, 0]
 
     return X, y
+
+def credit():
+    filename = "credit.csv"
+    data_df = pd.read_csv(GH_DATA_URL + filename)
+
+    X, y = data_df.iloc[:, 1:], data_df.iloc[:, 0]
+
+    return X, y

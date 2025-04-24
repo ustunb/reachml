@@ -1,14 +1,15 @@
-import pytest
-import pandas as pd
 import numpy as np
-from reachml.paths import tests_dir
+import pandas as pd
+import pytest
+
+import reachml
 from reachml.action_set import ActionSet
 from reachml.constraints import *
 
 
 @pytest.fixture(params=["credit"])
 def test_case(request):
-    X = pd.read_csv(tests_dir / "credit.csv").drop(columns=["NoDefaultNextMonth"])
+    X, _ = reachml.datasets.credit()
     A = ActionSet(X)
     A["Married"].actionable = False
     A[

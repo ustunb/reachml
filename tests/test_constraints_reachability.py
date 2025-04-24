@@ -2,19 +2,21 @@
 Test Strategy
 todo
 """
-import pytest
-import pandas as pd
+
 import numpy as np
-from reachml import *
-from reachml.reachable_set import EnumeratedReachableSet
-from reachml.paths import tests_dir
+import pandas as pd
+import pytest
+
+import reachml
+from reachml import ActionSet
 from reachml.constraints.reachability import ReachabilityConstraint
+from reachml.reachable_set import EnumeratedReachableSet
 
 
 @pytest.fixture(params=["credit_onehot", "credit_onehot_all_immutable"])
 def test_case(request):
     if "credit_onehot" in request.param:
-        X = pd.read_csv(tests_dir / "credit.csv")
+        X, _ = reachml.datasets.credit()
         names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
 
     A = ActionSet(X)
@@ -68,7 +70,9 @@ def test_initialization(test_case, values, reachability):
 def test_contains(test_case):
     A = test_case["A"]
     x = np.array([0.0, 0.0, 0.0, 0.0])
-    reachable_set = EnumeratedReachableSet(A, x, complete=True, values=np.vstack([x, np.eye(4)]))
+    reachable_set = EnumeratedReachableSet(
+        A, x, complete=True, values=np.vstack([x, np.eye(4)])
+    )
 
     y = np.array([2, 2, 2, 2])
     assert y not in reachable_set

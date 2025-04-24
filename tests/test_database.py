@@ -1,17 +1,19 @@
 import pathlib
+
 import numpy as np
 import pytest
-import pandas as pd
-from reachml import database
+
+import reachml
+from reachml import ReachableSetDatabase
 from reachml.action_set import ActionSet
-from reachml.database import ReachableSetDatabase
-from reachml.paths import tests_dir
 
 
 @pytest.fixture()
 def test_case():
     names = ["Age_lt_25", "Age_in_25_to_40", "Age_in_40_to_59", "Age_geq_60"]
-    X = pd.read_csv(tests_dir / "credit.csv")[names]
+    # X = pd.read_csv(tests_dir / "credit.csv")[names]
+    X, _ = reachml.datasets.credit()
+    X = X[names]
 
     A = ActionSet(X)
 
@@ -21,6 +23,7 @@ def test_case():
 
 
 precision = ReachableSetDatabase._PRECISION
+
 
 def test_content_addressable_encoding_integer(test_case):
     x1 = np.array([1, 2, 3])
