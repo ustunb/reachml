@@ -1,7 +1,6 @@
 import pandas as pd
 
-# GH_DATA_URL = "https://raw.githubusercontent.com/ustunb/reachml/main/data/"
-GH_DATA_URL = "/reachml/data/"
+GH_DATA_URL = "https://raw.githubusercontent.com/ustunb/reachml/main/data/"
 
 
 def givemecredit_cts_slim(n=100, label=[-1, 1]):
@@ -15,6 +14,7 @@ def givemecredit_cts_slim(n=100, label=[-1, 1]):
     X, y = data_df.iloc[:, 1:], data_df.iloc[:, 0]
 
     return X, y
+
 
 def credit():
     filename = "credit.csv"
