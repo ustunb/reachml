@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from cplex import SparsePair
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
@@ -9,6 +11,11 @@ from tqdm import tqdm
 from .action_set import ActionSet
 from .cplex_utils import has_solution
 from .mip import EnumeratorMIP
+
+RESP_BAR_COLOR = "#FFC000"
+
+# matplotlib font params
+plt.rcParams["font.size"] = 15
 
 
 class ResponsivenessScorer(ABC):
@@ -70,8 +77,34 @@ class ResponsivenessScorer(ABC):
     def _get_inter_key(self, x):
         pass
 
+    def plot(self, score_lst=None, x_idx=None):
+        if score_lst is None and x_idx is None:
+            raise ValueError("Either scores or x_idx must be provided")
+
+        if score_lst is None:
+            score_lst = self.scores[x_idx]
+
+        # Sort the scores and names together
+        names = self.action_set.names
+        sorted_data = sorted(
+            zip(score_lst, names), reverse=False
+        )  # Sort by score descending
+        sorted_scores, sorted_names = zip(*sorted_data)
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        ax.barh(sorted_names, sorted_scores, color=RESP_BAR_COLOR)
+        ax.set_xlabel("Responsiveness Score")
+        ax.set_yticks(range(len(sorted_scores)))
+        ax.set_xlim(0, 1)
+
+        return fig
+
     def __call__(self, X, clf, save=True, **kwargs):
         """ """
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+
         out = np.zeros((len(X), len(self.action_set)))
 
         for i, x in tqdm(enumerate(X), total=len(X)):
