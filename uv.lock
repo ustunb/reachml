@@ -1592,7 +1592,6 @@ dev = [
     { name = "pypdf2" },
     { name = "pytest" },
     { name = "rich" },
-    { name = "rpy2" },
     { name = "scikit-learn" },
     { name = "tabulate" },
     { name = "xgboost" },
@@ -1604,6 +1603,9 @@ explain = [
 recourse = [
     { name = "dice-ml" },
     { name = "recourse" },
+]
+verification = [
+    { name = "rpy2" },
 ]
 
 [package.metadata]
@@ -1630,7 +1632,6 @@ dev = [
     { name = "pypdf2", specifier = "~=3.0.1" },
     { name = "pytest", specifier = "~=8.3.4" },
     { name = "rich", specifier = "~=13.9.4" },
-    { name = "rpy2", specifier = "==3.5.2" },
     { name = "scikit-learn", specifier = "==1.5.2" },
     { name = "tabulate", specifier = "~=0.9.0" },
     { name = "xgboost", specifier = "==2.1.4" },
@@ -1643,6 +1644,7 @@ recourse = [
     { name = "dice-ml", specifier = "~=0.9" },
     { name = "recourse", specifier = "~=1.0.0" },
 ]
+verification = [{ name = "rpy2", specifier = "==3.5.2" }]
 
 [[package]]
 name = "recourse"
