@@ -1,3 +1,9 @@
+"""Content-addressable reachable-set database for feature vectors.
+
+This module provides `ReachableSetDatabase`, which generates, stores, and
+retrieves reachable sets keyed by a stable hash of the rounded feature vector.
+"""
+
 import hashlib
 import tempfile
 import time
@@ -11,31 +17,34 @@ import pandas as pd
 from tqdm.auto import tqdm
 
 from .action_set import ActionSet
-from .reachable_set import EnumeratedReachableSet, ReachableSet
+from .reachable_set import EnumeratedReachableSet, ReachableSet, SampledReachableSet
 
 
 class ReachableSetDatabase:
+    """Generate, store, and retrieve reachable sets over a dataset.
+
+    This database is content‑addressable: each reachable set is stored under a
+    key derived from its rounded feature vector.
+
+    Attributes:
+        action_set: The `ActionSet` used to generate reachable sets.
+        path: The HDF5 file backing this database.
+        precision: Digits used to round vectors before hashing.
     """
-    Container class to generate, store, and retrieve a collection of reachable sets over a dataset.
 
-    The database is content-addressable so the feature vectors are keys themselves.
-
-    Attrs:
-        action_set ActionSet: Action set.
-        path str: Path to the database.
-        precision int: Digits of precision.
-    """
-
-    _PRECISION = 4
+    _PRECISION = 8
     _METADATA_ATTR_NAME = "metadata"
     _X_ATTR_NAME = "x"
     _STATS_ATTR_NAME = "stats"
     _STATS_KEYS = ["time", "n_points", "complete"]
 
     def __init__(self, action_set: ActionSet, path: str = None, **kwargs):
-        """
-        :param action_set:
-        :param path:
+        """Initialize a reachable-set database.
+
+        Args:
+            action_set: Action set for generating reachable sets.
+            path: Optional path to an HDF5 file; creates a temp file if None.
+            **kwargs: Optional `precision` (int) and generation `method`.
         """
         assert isinstance(action_set, ActionSet)
         self._action_set = action_set
@@ -46,8 +55,8 @@ class ReachableSetDatabase:
         try:
             with h5py.File(f, "a") as _:
                 pass
-        except FileNotFoundError:
-            raise ValueError(f"Cannot write to database file: {f}")
+        except FileNotFoundError as err:
+            raise ValueError(f"Cannot write to database file: {f}") from err
         self._path = f
 
         # attach precision
@@ -56,48 +65,52 @@ class ReachableSetDatabase:
         self._precision = int(precision)
 
         # determine generation method
-        default = (
-            "enumerate" if action_set.can_enumerate else "sample"
-        )  # default from action_set
+        default = "enumerate" if action_set.can_enumerate else "sample"  # default from action_set
         self._method = kwargs.get("method", default)
 
-        self.RS = (
-            EnumeratedReachableSet
-            # if self._method == "enumerate"
-            # else SampledReachableSet
-        )
+        self.RS = EnumeratedReachableSet if self._method == "enumerate" else SampledReachableSet
 
         return
 
     @property
     def action_set(self) -> ActionSet:
+        """Action set used to generate reachable sets."""
         return self._action_set
 
     @property
     def path(self) -> Path:
+        """Path to the underlying HDF5 database file."""
         return self._path
 
     @property
     def precision(self) -> int:
+        """Number of rounding digits applied before hashing keys."""
         return self._precision
 
     @property
     def method(self) -> str:
+        """Generation method: "enumerate" or "sample"."""
         return self._method
 
     def array_to_key(self, x: np.ndarray) -> str:
-        float_dtype = np.float32 if self._precision <= 4 else np.float64
+        """Compute a stable content hash key for a feature vector.
+
+        Rounds `x` to `precision` digits using a float16/32 container before
+        hashing to reduce sensitivity to tiny numeric differences.
+        """
+        float_dtype = np.float16 if self._precision <= 4 else np.float32
         b = np.array(x, dtype=float_dtype).round(self._precision).tobytes()
         return hashlib.sha256(b).hexdigest()
 
     def __len__(self) -> int:
-        """number of distinct points for which we have a reachable set"""
+        """Number of distinct points for which we have a reachable set."""
         out = 0
         with h5py.File(self.path, "r") as db:
             out = len(db)
         return out
 
     def keys(self) -> np.ndarray:
+        """Return the list of feature vectors stored in the database."""
         out = []
         with h5py.File(self.path, "r") as backend:
             out = [backend[k].attrs[self._X_ATTR_NAME] for k in backend.keys()]
@@ -105,10 +118,13 @@ class ReachableSetDatabase:
         return out
 
     def __getitem__(self, x: Union[np.ndarray, pd.Series]) -> ReachableSet:
-        """
-        Fetches the reachable set for feature vector x
-        :param x numpy.ndarray: Feature vector
-        :return:
+        """Fetch the reachable set for feature vector `x`.
+
+        Args:
+            x: Feature vector as `np.ndarray`, `pd.Series`, or list.
+
+        Returns:
+            A `ReachableSet` instance reconstructed from the database entry.
         """
         if isinstance(x, list):
             x = np.array(x)
@@ -118,18 +134,22 @@ class ReachableSetDatabase:
         try:
             with h5py.File(self.path, "r") as db:
                 args = dict(
-                    zip(self.RS._METADATA_KEYS, db[key].attrs[self._METADATA_ATTR_NAME])
+                    zip(
+                        self.RS._METADATA_KEYS,
+                        db[key].attrs[self._METADATA_ATTR_NAME],
+                        strict=False,
+                    )
                 )
                 args.update({"time": db[key].attrs[self._STATS_ATTR_NAME][-1]})
                 out = self.RS(self._action_set, x=x, values=db[key], **args)
-        except KeyError:
+        except KeyError as err:
             raise KeyError(
-                f"point `x={str(x)}` with `key = {key}` not found in database at `{self.path}`."
-            )
+                f"point x={str(x)} with key={key} not found in database at {self.path}"
+            ) from err
         return out
 
     def _store_reachable_set(self, db, key, x, reachable_set, final_time):
-        """stores reachable set in database and returns summary statistics"""
+        """Store a reachable set and return summary statistics dict."""
         stats = {
             "n_points": len(reachable_set),
             "complete": reachable_set.complete,
@@ -142,25 +162,24 @@ class ReachableSetDatabase:
         db[key].attrs[ReachableSetDatabase._METADATA_ATTR_NAME] = (
             reachable_set._get_metadata().astype(np.float32).values
         )
-        db[key].attrs[ReachableSetDatabase._STATS_ATTR_NAME] = np.array(
-            list(stats.values())
-        )
+        db[key].attrs[ReachableSetDatabase._STATS_ATTR_NAME] = np.array(list(stats.values()))
         return stats
 
     def generate(
         self, X: Union[np.ndarray, pd.DataFrame], overwrite: bool = False, **kwargs
     ):
+        """Generate reachable sets for each row in `X` and persist them.
+
+        Args:
+            X: Feature matrix (`np.ndarray` or `pd.DataFrame`).
+            overwrite: If True, overwrite any existing entries for keys in `X`.
+            **kwargs: Passed to `ReachableSet` constructors and `.generate()`; for
+                sampling, includes `resp_thresh`, `n`, `seed`, and `solver`.
+
+        Returns:
+            `pd.DataFrame` with summary statistics (time, n_points, complete).
         """
-        Generate reachable sets for each feature vector in X
-        :param X: feature matrix (np.array or pd.DataFrame)
-        :param overwrite: whether to overwrite existing entries
-        :param kwargs: additional arguments to pass to ReachableSet.generate. For sampling:
-            - resp_thresh: responsiveness lower bound (epsilon in the paper)
-            - n: number of samples (overrides thresholds)
-        :return: pd.DataFrame of summary statistics about the reachable sets
-        """
-        # todo: replace with reachable_set = ReachableSet.generate()
-        # todo: make sure we have iid samples for each point / only do the duplicate trick for continuous cases
+        # Note: duplicates per unique mutable pattern are handled efficiently.
         if isinstance(X, pd.DataFrame):
             X = X.values
         assert X.ndim == 2 and X.shape[0] > 0 and X.shape[1] == len(self.action_set), (
@@ -168,10 +187,10 @@ class ReachableSetDatabase:
         )
         assert np.isfinite(X).all()
 
-        flatten = lambda xss: [x for xs in xss for x in xs]
-        mutable = sorted(
-            flatten(self.action_set.actionable_partition)
-        )  # actionable or targeted
+        def flatten(xss):
+            return [x for xs in xss for x in xs]
+
+        mutable = sorted(flatten(self.action_set.actionable_partition))  # actionable or targeted
         immutable = list(set(range(len(self.action_set))) - set(mutable))
         U = np.unique(X, axis=0)
         _, types, types_to_x = np.unique(
@@ -179,11 +198,19 @@ class ReachableSetDatabase:
         )
         siblings = {i: np.flatnonzero(i == types_to_x) for i in range(len(types))}
 
+        if self._method == "sample":
+            init_seed_seq = np.random.SeedSequence(kwargs.get("seed", None))
+            seed_seqs = init_seed_seq.spawn(U.shape[0])
+        else:
+            seed_seqs = [None] * U.shape[0]
+
         out = []
         with h5py.File(self.path, "a") as db:
-            for unique_mutable_idx, sib_idxs in tqdm(siblings.items()):
+            for _unique_mutable_idx, sib_idxs in tqdm(siblings.items()):
                 x = U[sib_idxs[0]]
                 key = self.array_to_key(x)
+                seed_seq = seed_seqs[sib_idxs[0]]
+                kwargs["seed"] = seed_seq
 
                 new_entries = []
                 if overwrite or key not in db:
@@ -197,6 +224,9 @@ class ReachableSetDatabase:
 
                 for s in sib_idxs[1:]:
                     key = self.array_to_key(U[s])
+                    seed_seq = seed_seqs[s]
+                    kwargs["seed"] = seed_seq
+
                     if overwrite or key not in db:
                         start_time = time.time()
                         reachable_set = self._gen_sibling_reachable_set(
@@ -212,14 +242,16 @@ class ReachableSetDatabase:
         return out
 
     def _gen_sibling_reachable_set(self, x, sib_rs, immutable, **kwargs):
-        """returns a sibling ReachableSet by making a deepcopy and:
-        if self._method = "enumerate", we change immutable feature values of sib_rs.X to match x (no extra computation)
-        if self._method = "sample", we sample again
+        """Construct a sibling reachable set for `x` from an existing one.
+
+        For "enumerate", copy and align immutable feature values in-place.
+        For "sample", reseed, reset, and resample.
 
         Args:
-            x (np.ndarray): Feature vector
-            sib_rs (ReachabeSet): ReachableSet of a sibling point (of x)
-            immutable (list): List of immutable feature indices
+            x: Feature vector for the sibling point.
+            sib_rs: ReachableSet of a sibling point.
+            immutable: List of immutable feature indices.
+            **kwargs: Passed through to reachable-set constructors/generation.
         """
         # Perhaps move values = to enumerate
         R = self.RS(self.action_set, x, values=sib_rs.X, **kwargs)
@@ -230,6 +262,7 @@ class ReachableSetDatabase:
             R._complete = True
         else:
             R = deepcopy(sib_rs)
+            R.seed = kwargs.get("seed", R.seed)
             R.x = x
             R.reset()
             R.generate(**kwargs)

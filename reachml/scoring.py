@@ -1,30 +1,22 @@
+"""Responsiveness scoring utilities (enumeration and sampling)."""
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from cplex import SparsePair
+from typing import List
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
 from .action_set import ActionSet
-from .cplex_utils import has_solution
 from .mip import EnumeratorMIP
-
-RESP_BAR_COLOR = "#FFC000"
-
-# matplotlib font params
-plt.rcParams["font.size"] = 15
 
 
 class ResponsivenessScorer(ABC):
-    def __new__(
-        cls, action_set, db=None, inter=None, cnts=None, method="auto", **kwargs
-    ):
-        """
-        Factory method to create a ResponsivenessScorer instance
-        """
+    """Base scorer that computes per-feature responsiveness for a point."""
+
+    def __new__(cls, action_set, db=None, inter=None, cnts=None, method="auto", **kwargs):
+        """Factory method to create a ResponsivenessScorer instance."""
         assert isinstance(action_set, ActionSet)
         if method == "auto":
             if action_set.can_enumerate or db is not None:
@@ -37,74 +29,65 @@ class ResponsivenessScorer(ABC):
         raise ValueError(f"method {method} is not valid")
 
     def __init__(self, action_set, db=None, *args, **kwargs):
+        """Initialize the base scorer with an action set and optional DB."""
         self._action_set = action_set
         self._db = db
         self._inter = {} if args == () else args[0]
         self._act_feats = sorted(list(action_set.actionable_features))
-        self._act_part_feats = [
-            f for part in action_set.actionable_partition for f in part
-        ]
+        self._act_part_feats = [f for part in action_set.actionable_partition for f in part]
 
     @property
     def action_set(self):
+        """Action set used for feasible interventions."""
         return self._action_set
 
     @property
     def db(self):
+        """Reachable set database backing enumeration/filtering (optional)."""
         return self._db
 
     @property
     def inter(self):
+        """Cached interventions keyed by an `x`-dependent key."""
         return self._inter
 
     @property
     def act_feats(self):
+        """Indices of actionable features."""
         return self._act_feats
 
     @property
     def act_part_feats(self):
+        """Flattened list of features in actionable partitions."""
         return self._act_part_feats
 
     @abstractmethod
     def score(self, x, pred_f, target=1):
+        """Compute responsiveness scores for a point `x`."""
         pass
 
     @abstractmethod
     def build_inter(self, x):
+        """Build and cache interventions for a point `x`."""
         pass
 
     @abstractmethod
     def _get_inter_key(self, x):
+        """Return a hashable key for caching interventions for `x`."""
         pass
 
-    def plot(self, score_lst=None, x_idx=None):
-        if score_lst is None and x_idx is None:
-            raise ValueError("Either scores or x_idx must be provided")
-
-        if score_lst is None:
-            score_lst = self.scores[x_idx]
-
-        # Sort the scores and names together
-        names = self.action_set.names
-        sorted_data = sorted(
-            zip(score_lst, names), reverse=False
-        )  # Sort by score descending
-        sorted_scores, sorted_names = zip(*sorted_data)
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-        ax.barh(sorted_names, sorted_scores, color=RESP_BAR_COLOR)
-        ax.set_xlabel("Responsiveness Score")
-        ax.set_yticks(range(len(sorted_scores)))
-        ax.set_xlim(0, 1)
-
-        return fig
-
     def __call__(self, X, clf, save=True, **kwargs):
-        """ """
-        if isinstance(X, pd.DataFrame):
-            X = X.values
+        """Compute per-feature responsiveness scores for each row in `X`.
 
+        Args:
+            X: 2D array of points.
+            clf: Estimator with `predict` function.
+            save: If True, cache inputs and outputs on the instance.
+            **kwargs: Extra arguments forwarded to `score`.
+
+        Returns:
+            Numpy array of shape (n_samples, n_features) with responsiveness scores.
+        """
         out = np.zeros((len(X), len(self.action_set)))
 
         for i, x in tqdm(enumerate(X), total=len(X)):
@@ -118,6 +101,7 @@ class ResponsivenessScorer(ABC):
         return out
 
     def __reduce__(self):
+        """Pickle protocol support."""
         return (self.__class__, (self.action_set, self.db, self.inter))
 
     def _find_actions(self, x, aj, j, find_all=True):
@@ -133,31 +117,29 @@ class ResponsivenessScorer(ABC):
         action_set_part = self.action_set[j_part]
 
         R = EnumeratorMIP(action_set=action_set_part, x=x_part)
-        cpx, idx = R.mip, R.indices
-        cons = cpx.linear_constraints
-        # adding constraint to match action
-        cons.add(
-            names=[f"match_c[{j_idx}]"],
-            lin_expr=[SparsePair(ind=[f"c[{j_idx}]"], val=[1.0])],
-            senses=["E"],
-            rhs=[float(aj)],
+        # add constraint to match action on component j_idx
+        R.add_linear_constraint(
+            name=f"match_c[{j_idx}]",
+            terms=[("c", j_idx, 1.0)],
+            sense="E",
+            rhs=float(aj),
         )
-        cpx.solve()
+        R.solve_model()
 
-        aj_acts = []
-        while has_solution(cpx):
-            names = idx.names
-            acts = cpx.solution.get_values(names["c"])
-            aj_acts.append(acts)
+        aj_acts: List[List[float]] = []
+        while R.solution_exists:
+            acts = R.current_solution
+            if acts is None:
+                break
+            aj_acts.append(list(acts))
 
             # TODO: check if this is what we want
-            if sum(map(bool, acts)) == 1 or not find_all:
-                # found action that only changes j
-                # means it is not necessary for other features to change
-                break
+            # if sum(map(bool, acts)) == 1 or not find_all:
+            # found action that only changes j
+            # means it is not necessary for other features to change
+            # break
 
             R.remove_actions([acts])
-            cpx.solve()
 
         if len(aj_acts) == 0:
             return np.array([])
@@ -165,23 +147,31 @@ class ResponsivenessScorer(ABC):
         out = np.zeros((len(aj_acts), len(x)))
         out[:, j_part] = np.vstack(aj_acts)
 
+        # cleanup constraint
+        R.delete_constraint(f"match_c[{j_idx}]")
         return out
 
     def __repr__(self):
+        """Debug string with class name."""
         return f"{self.__class__.__name__}"
 
 
 class EnumeratingScorer(ResponsivenessScorer):
+    """Score responsiveness using enumeration or filtering via a database."""
+
     def __init__(self, action_set, db=None, *args, **kwargs):
+        """Initialize enumerating scorer with method selection."""
         super().__init__(action_set, db, *args, **kwargs)
         self._method = "enumerate" if db is None else "filter"
 
     @property
     def db(self):
+        """Reachable set database (may be None)."""
         return self._db
 
     @property
     def method(self):
+        """Current scoring method: "enumerate" or "filter"."""
         return self._method
 
     @method.setter
@@ -193,12 +183,13 @@ class EnumeratingScorer(ResponsivenessScorer):
 
     @property
     def generate_call(self):
+        """Return the function that generates 1D interventions for a feature."""
         if self.method == "filter":
             return self._filter_1D
         return self._enumerate_1D
 
     def score(self, x, pred_f, target=1):
-        """ """
+        """Score a single point by fraction of interventions achieving `target`."""
         key = self._get_inter_key(x)
         if key not in self.inter:
             self.build_inter(x)
@@ -222,6 +213,7 @@ class EnumeratingScorer(ResponsivenessScorer):
         return score_out
 
     def build_inter(self, x):
+        """Build and cache 1D intervention sets for point `x`."""
         key = self._get_inter_key(x)
         if key in self.inter:
             return
@@ -233,9 +225,7 @@ class EnumeratingScorer(ResponsivenessScorer):
         self._inter[key] = actions
 
     def _filter_1D(self, x, j):
-        """
-        helper function to calculate responsiveness scores
-        """
+        """Filter database actions to those that change feature `j` only."""
         rs_x = self.reach_db[x]
         actions = rs_x.actions
 
@@ -279,7 +269,7 @@ class EnumeratingScorer(ResponsivenessScorer):
         return np.vstack(marg_acts)[min_size]
 
     def _enumerate_1D(self, x, j, actions=True):
-        """ """
+        """Enumerate actions that achieve change `aj` for feature `j`."""
         aj_lst = self.action_set[j].reachable_grid(x[j], return_actions=True)
         aj_lst = aj_lst[aj_lst != 0]
 
@@ -294,15 +284,20 @@ class EnumeratingScorer(ResponsivenessScorer):
         return tuple(x[self.act_part_feats])
 
     def __reduce__(self):
+        """Pickle protocol support for enumerating scorer."""
         return (self.__class__, (self.action_set, self.db, self.inter))
 
 
 class SamplingScorer(ResponsivenessScorer):
+    """Score responsiveness using sampling of interventions per feature."""
+
     def __init__(self, action_set, db=None, *args, **kwargs):
+        """Initialize sampling scorer with optional database and caches."""
         super().__init__(action_set, db, *args, **kwargs)
         self._samp_cnts = {} if args == () else args[1]
 
     def score(self, x, pred_f, target=1, n=500):
+        """Score a single point using sampled interventions per feature."""
         key = self._get_inter_key(x)
         if key not in self.inter:
             self.build_inter(x, n=n)
@@ -319,9 +314,7 @@ class SamplingScorer(ResponsivenessScorer):
             all_inter_cnt = self._samp_cnts[key][j]
 
             if isinstance(all_inter_cnt, np.int32):
-                all_inter_cnt = (
-                    np.ones(all_inter.shape[0], dtype=np.int32) * all_inter_cnt
-                )
+                all_inter_cnt = np.ones(all_inter.shape[0], dtype=np.int32) * all_inter_cnt
 
             xp = x + all_inter
             yp = pred_f(xp)
@@ -332,6 +325,7 @@ class SamplingScorer(ResponsivenessScorer):
         return score_out
 
     def build_inter(self, x, n):
+        """Sample and cache interventions for point `x` (count-weighted)."""
         key = self._get_inter_key(x)
         if key in self.inter:
             return
@@ -352,13 +346,13 @@ class SamplingScorer(ResponsivenessScorer):
         self._samp_cnts[key] = cnts
 
     def _sample_1D(self, x, j, n=500, actions=True):
-        """ """
+        """Sample interventions for feature `j` (dispatch by type)."""
         if self.action_set[j].discrete:
             return self._sample_discrete(x, j, n, actions)
         return self._sample_continuous(x, j, n, actions)
 
     def _sample_continuous(self, x, j, n=500, actions=True):
-        """ """
+        """Sample continuous actions for feature `j` within feasible bounds."""
         low = self.action_set[j].get_action_bound(x[j], bound_type="lb")
         high = self.action_set[j].get_action_bound(x[j], bound_type="ub")
 
@@ -371,7 +365,7 @@ class SamplingScorer(ResponsivenessScorer):
             aj_lst = np.random.uniform(low=low, high=high, size=n)
             aj_uni, cnt = np.unique(aj_lst, return_counts=True)
 
-            for aj, n_aj in zip(aj_uni, cnt):
+            for aj, n_aj in zip(aj_uni, cnt, strict=False):
                 aj_acts = self._find_actions(x, aj, j, find_all=False)
 
                 if aj_acts.shape[0] > 0:
@@ -385,7 +379,7 @@ class SamplingScorer(ResponsivenessScorer):
         return out_act, out_cnt
 
     def _sample_discrete(self, x, j, n=500, actions=True):
-        """ """
+        """Sample discrete actions for feature `j` over its reachable grid."""
         act_grid = self.action_set[j].reachable_grid(x[j], return_actions=True)
         non_zero_acts = act_grid[act_grid != 0]
 
@@ -400,7 +394,7 @@ class SamplingScorer(ResponsivenessScorer):
             aj_lst = np.random.choice(samp_acts, samp_remain, replace=True)
             aj_uni, cnt = np.unique(aj_lst, return_counts=True)
 
-            for aj, n_aj in zip(aj_uni, cnt):
+            for aj, n_aj in zip(aj_uni, cnt, strict=False):
                 aj_acts = self._find_actions(x, aj, j, find_all=False)
 
                 if aj_acts.shape[0] == 0:
@@ -416,7 +410,9 @@ class SamplingScorer(ResponsivenessScorer):
         return out_act, out_cnt
 
     def _get_inter_key(self, x):
+        """Key used to cache interventions (entire `x` for sampling scorer)."""
         return tuple(x)
 
     def __reduce__(self):
+        """Pickle protocol support with sampled counts."""
         return (self.__class__, (self.action_set, self.db, self.inter, self._samp_cnts))
