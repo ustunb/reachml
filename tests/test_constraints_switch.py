@@ -12,6 +12,7 @@ import numpy as np
 from reachml import *
 from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.switch import MutabilitySwitch
+from reachml.utils import SUPPORTED_SOLVERS
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
 
@@ -165,8 +166,8 @@ def test_initialization(on_value, force):
     dropped = A.constraints.drop(const_id)
     assert dropped
 
-
-def test_enumeration_with_switch_constraints(on_value, force):
+@pytest.mark.parametrize("solver", SUPPORTED_SOLVERS)
+def test_enumeration_with_switch_constraints(on_value, force, solver):
     test_case = get_test_case(on_value, force)
     X = test_case["X"]
     A = test_case["A"]
@@ -184,7 +185,7 @@ def test_enumeration_with_switch_constraints(on_value, force):
         if cons.check_feasibility(x):
             print(f"enumeration for x={x}\n")
             expected_set = test_case["expected_sets"].get(tuple(x))
-            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A, solver=solver)
             reachable_set.generate()
             assert reachable_set.complete
             # print(f'expected_set.X\n{expected_set}\n')
@@ -194,7 +195,50 @@ def test_enumeration_with_switch_constraints(on_value, force):
             assert np.array_equal(sortrows(reachable_set.X), sortrows(expected_set))
         else:
             with pytest.raises(AssertionError):
-                ReachableSetEnumerator(x=x, action_set=A)
+                ReachableSetEnumerator(x=x, action_set=A, solver=solver)
+
+
+def test_enumeration_with_switch_constraints_scip_and_cplex(on_value, force):
+    try:
+        assert "scip" in SUPPORTED_SOLVERS and "cplex" in SUPPORTED_SOLVERS
+    except AssertionError:
+        print("SCIP and CPLEX are not both supported solvers.")
+        pytest.skip()
+
+    test_case = get_test_case(on_value, force)
+    X = test_case["X"]
+    A = test_case["A"]
+    print(A)
+    names = X.columns.tolist()
+    cons = MutabilitySwitch(
+        switch=names[0],
+        targets=names[1:],
+        on_value=on_value,
+        force_change_when_off=force,
+    )
+    A.constraints.add(constraint=cons)
+    print(cons)
+    for idx, x in enumerate(X.values):
+        if cons.check_feasibility(x):
+            print(f"enumeration for x={x}\n")
+            expected_set = test_case["expected_sets"].get(tuple(x))
+            scip_reachable_set = EnumeratedReachableSet(x=x, action_set=A, solver="scip")
+            scip_reachable_set.generate()
+            assert scip_reachable_set.complete
+            assert np.array_equal(sortrows(scip_reachable_set.X), sortrows(expected_set))
+            cplex_reachable_set = EnumeratedReachableSet(x=x, action_set=A, solver="cplex")
+            cplex_reachable_set.generate()
+            assert cplex_reachable_set.complete
+            assert np.array_equal(sortrows(cplex_reachable_set.X), sortrows(expected_set))
+            assert np.array_equal(
+                sortrows(scip_reachable_set.X), sortrows(cplex_reachable_set.X)
+            )
+        else:
+            with pytest.raises(AssertionError):
+                ReachableSetEnumerator(x=x, action_set=A, solver="scip")
+            with pytest.raises(AssertionError):
+                ReachableSetEnumerator(x=x, action_set=A, solver="cplex")
+    
 
 
 if __name__ == "__main__":

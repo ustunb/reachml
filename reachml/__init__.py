@@ -1,5 +1,6 @@
 """Public API for the reachml package."""
 
+from . import constraints, datasets
 from .action_set import ActionSet
 from .auditor import ResponsivenessAuditor
 from .database import ReachableSetDatabase
@@ -12,4 +13,6 @@ __all__ = [
     "ReachableSet",
     "ReachableSetDatabase",
     "ResponsivenessAuditor",
+    "constraints",
+    "datasets",
 ]
