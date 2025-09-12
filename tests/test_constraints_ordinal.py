@@ -8,6 +8,7 @@ import numpy as np
 from reachml import *
 from reachml.reachable_set import EnumeratedReachableSet
 from reachml.constraints.ordinal import OrdinalEncoding
+from reachml.utils import SUPPORTED_SOLVERS
 
 sortrows = lambda v: v[np.lexsort(v.T, axis=0), :]
 
@@ -109,8 +110,8 @@ def test_initialization(exhaustive, step_direction):
     dropped = A.constraints.drop(const_id)
     assert dropped
 
-
-def test_enumeration_with_ordinal_constraints(exhaustive, step_direction):
+@pytest.mark.parametrize("solver", SUPPORTED_SOLVERS)
+def test_enumeration_with_ordinal_constraints(exhaustive, step_direction, solver):
     test_case = get_test_case(exhaustive, step_direction)
     X = test_case["X"]
     valid_values = test_case["valid_values"]
@@ -127,10 +128,55 @@ def test_enumeration_with_ordinal_constraints(exhaustive, step_direction):
     for idx, x in enumerate(all_values):
         expected_set = test_case["expected_sets"].get(tuple(x))
         if constraint.check_encoding(x):
-            reachable_set = EnumeratedReachableSet(x=x, action_set=A)
+            reachable_set = EnumeratedReachableSet(x=x, action_set=A, solver=solver)
             reachable_set.generate()
             assert reachable_set.complete
             assert np.array_equal(sortrows(reachable_set.X), expected_set)
         else:
             with pytest.raises(AssertionError):
-                EnumeratedReachableSet(x=x, action_set=A).generate()
+                EnumeratedReachableSet(x=x, action_set=A, solver=solver).generate()
+
+
+def test_enumeration_with_ordinal_constraints_scip_and_cplex(exhaustive, step_direction):
+    try:
+        assert "scip" in SUPPORTED_SOLVERS and "cplex" in SUPPORTED_SOLVERS
+    except AssertionError:
+        print("SCIP and CPLEX are not both supported solvers.")
+        pytest.skip()
+
+
+    test_case = get_test_case(exhaustive, step_direction)
+    X = test_case["X"]
+    valid_values = test_case["valid_values"]
+    all_values = test_case["all_values"]
+    names = X.columns.tolist()
+
+    # create constraint
+    constraint = OrdinalEncoding(
+        names=names, exhaustive=exhaustive, step_direction=step_direction
+    )
+    A = ActionSet(X)
+    A.constraints.add(constraint=constraint)
+
+    for idx, x in enumerate(all_values):
+        expected_set = test_case["expected_sets"].get(tuple(x))
+        if constraint.check_encoding(x):
+            reachable_set_scip = EnumeratedReachableSet(
+                x=x, action_set=A, solver="scip"
+            )
+            reachable_set_scip.generate()
+            assert reachable_set_scip.complete
+            assert np.array_equal(sortrows(reachable_set_scip.X), expected_set)
+
+            reachable_set_cplex = EnumeratedReachableSet(
+                x=x, action_set=A, solver="cplex"
+            )
+            reachable_set_cplex.generate()
+            assert reachable_set_cplex.complete
+            assert np.array_equal(sortrows(reachable_set_cplex.X), expected_set)
+            assert reachable_set_scip == reachable_set_cplex
+        else:
+            with pytest.raises(AssertionError):
+                EnumeratedReachableSet(x=x, action_set=A, solver="scip").generate()
+            with pytest.raises(AssertionError):
+                EnumeratedReachableSet(x=x, action_set=A, solver="cplex").generate()

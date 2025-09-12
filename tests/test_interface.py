@@ -1,15 +1,14 @@
-import numpy as np
 import pytest
-
-import reachml
+import numpy as np
+import pandas as pd
+from reachml.paths import tests_dir
 from reachml.action_set import ActionSet
 from reachml.constraints import *
 
 
 @pytest.fixture(params=["credit"])
 def test_case(request):
-    # X = pd.read_csv(tests_dir / "credit.csv").drop(columns=["NoDefaultNextMonth"])
-    X, _ = reachml.datasets.credit()
+    X = pd.read_csv(tests_dir / "credit.csv").drop(columns=["NoDefaultNextMonth"])
     A = ActionSet(X)
     A["Married"].actionable = False
     A[
@@ -91,7 +90,7 @@ def test_add_drop_constraint(test_case, constraint_info):
         # cannot add a constraint with the same parameters either
         same_cons = constraintClass(names=info["names"], **info["parameters"])
         assert cons == same_cons
-        assert cons is not same_cons
+        assert not cons is same_cons
 
         with pytest.raises(AssertionError):
             A.constraints.add(same_cons)

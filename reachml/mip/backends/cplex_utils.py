@@ -1,3 +1,5 @@
+"""CPLEX utilities: variable tracking, parameters, and basic helpers."""
+
 import operator
 from functools import reduce
 from itertools import chain
@@ -9,10 +11,12 @@ from cplex.exceptions import CplexError
 
 
 def concat(d):
+    """Concatenate dict-of-lists values into a single list (preserve order)."""
     return list(chain.from_iterable(d.values()))
 
 
 def combine(a, b):
+    """Combine two dicts of lists by key-wise concatenation."""
     return {key: a.get(key, []) + b.get(key, []) for key in (a.keys() | b.keys())}
 
 
@@ -21,17 +25,13 @@ CPX_INFEASIBLE_STATUS_CODES = (103,)
 
 
 def is_certifiably_infeasible(cpx):
-    """
-    checks if solution from Cplex object is certifiably infeasible
-    :param cpx: Cplex object
-    :return: True if Cplex solution is certifiably infeasible
-    """
+    """Return True if the solution status indicates infeasibility."""
     out = cpx.solution.get_status() in CPX_INFEASIBLE_STATUS_CODES
     return out
 
 
 def has_solution(cpx):
-    """returns true if old_tests has a feasible solution"""
+    """Return True if the model exposes a solution in `cpx.solution`."""
     out = False
     try:
         cpx.solution.get_values()
@@ -46,12 +46,7 @@ VTYPE_TO_CPXTYPE = {int: "I", bool: "I", float: "C"}
 
 
 class CplexGroupedVariableIndices(object):
-    """
-    Class used to represent and manipulate information about a CPLEX MIP object
-    We use this to store:
-     - information about variables in the MIP
-     - information about parameters in the MIP
-    """
+    """Track grouped variables and parameters for a CPLEX MIP object."""
 
     variable_fields = (
         "names",
@@ -63,6 +58,7 @@ class CplexGroupedVariableIndices(object):
     mip_fields = "params"
 
     def __init__(self):
+        """Initialize tracking maps for variable groups and parameters."""
         # initialize variable fields
         for field in self.variable_fields:
             self.__setattr__(field, {})
@@ -72,19 +68,10 @@ class CplexGroupedVariableIndices(object):
         return
 
     def append_variables(self, cpx_variable_args):
-        """
-        append information about the (names, objective, ub, lb, types) for variables in a Cplex() object
-        :param cpx_variable_args: dictionary of the form {variable_group_name: variable_group_info}
-               where `variable_group_name` is a string showing the name of the group
-               and `variable_group_info` is a dictionary with keys names, ub, lb, types
-               Example:
-               cpx_variable_args {'a': {
-                  'names': ['a[0]', 'a[1]'],
-                  'obj': [0,0],
-                  'ub': [1,1],
-                  'lb': [0,0],
-                  'types': ['I', 'I']
-               }
+        """Append variable metadata from grouped `cpx_variable_args`.
+
+        The `cpx_variable_args` format is a mapping from group name to a dict
+        with keys `names`, `obj`, `ub`, `lb`, `types`.
         """
         for field in self.variable_fields:
             f = self.__getattribute__(field)
@@ -96,11 +83,7 @@ class CplexGroupedVariableIndices(object):
         assert self.__check_rep__()
 
     def append_parameters(self, parameters, overwrite=False):
-        """
-        append parameters
-        :param parameters:
-        :return:
-        """
+        """Append or update stored parameter values."""
         if overwrite:
             self.params.update(parameters)
         else:
@@ -113,6 +96,7 @@ class CplexGroupedVariableIndices(object):
                     raise ValueError(f"appending new value for parameter {name}")
 
     def __check_rep__(self):
+        """Check internal consistency across all variable group fields."""
         variable_group_names = self.names.keys()
         for field in self.variable_fields:
             field_dict = self.__getattribute__(field)
@@ -122,11 +106,7 @@ class CplexGroupedVariableIndices(object):
         return True
 
     def check_cpx(self, cpx):
-        """
-        returns true if we have stored the right names, lb, ub, obj for each variable in a Cplex MIP object
-        :param cpx:
-        :return:
-        """
+        """Check names, bounds, types, and objectives match those in `cpx`."""
         assert isinstance(cpx, Cplex)
         vars = cpx.variables
         assert self.__check_rep__()
@@ -146,30 +126,20 @@ class CplexGroupedVariableIndices(object):
 
 
 def get_cpx_variable_types(action_set, indices=None):
+    """Return a string of CPLEX variable-type codes for selected features."""
     if indices is None:
         indices = range(len(action_set))
     out = "".join(
-        [
-            VTYPE_TO_CPXTYPE[vt]
-            for j, vt in enumerate(action_set.variable_type)
-            if j in indices
-        ]
+        [VTYPE_TO_CPXTYPE[vt] for j, vt in enumerate(action_set.variable_type) if j in indices]
     )
     return out
 
 
 def get_cpx_variable_args(name, obj, ub, lb, vtype):
-    """
-    Construct a dictionary of arguments to add multiple variables to a Cplex object
-    This will automatically adjust fields with scalar values into a list and pass
-    them in the right format
-    :param name:
-    :param obj:
-    :param ub:
-    :param lb:
-    :param vtype: variable type ['B', 'I', 'C']
-    :return: `variable_args`, dictionary which can be used to add variables to a Cplex() object as
-             cpx.variables.add(**variable_args)
+    """Prepare grouped variable arguments to add to a CPLEX model.
+
+    This normalizes scalar inputs to lists and validates lengths, returning a
+    dict suitable for `cpx.variables.add(**variable_args)`.
     """
     # name
     if isinstance(name, np.ndarray):
@@ -183,8 +153,8 @@ def get_cpx_variable_args(name, obj, ub, lb, vtype):
         # convert to list
         name = name if isinstance(name, list) else [name]
         obj = [float(obj[0])] if isinstance(obj, list) else [float(obj)]
-        ub = [float(ub[0])] if isinstance(ub, list) else [float(ub)]
-        lb = [float(lb[0])] if isinstance(lb, list) else [float(lb)]
+        ub = [float(ub[0])] if isinstance(ub, (list, np.ndarray)) else [float(ub)]
+        lb = [float(lb[0])] if isinstance(lb, (list, np.ndarray)) else [float(lb)]
         vtype = vtype if isinstance(vtype, list) else [vtype]
     else:
         # convert to list
@@ -197,8 +167,7 @@ def get_cpx_variable_args(name, obj, ub, lb, vtype):
                 vtype = list(vtype)
             else:
                 raise ValueError(
-                    "invalid length: len(vtype) = %d. expected either 1 or %d"
-                    % (len(vtype), nvars)
+                    "invalid length: len(vtype) = %d. expected either 1 or %d" % (len(vtype), nvars)
                 )
 
         if isinstance(obj, np.ndarray):
@@ -273,8 +242,7 @@ def get_cpx_variable_args(name, obj, ub, lb, vtype):
 
 
 def get_mip_stats(cpx):
-    """returns information associated with the current best solution for the old_tests"""
-
+    """Return a dict of high-level MIP statistics and solution info."""
     info = {
         "status": "no solution exists",
         "status_code": float("nan"),
@@ -324,6 +292,7 @@ def get_mip_stats(cpx):
 
 
 def copy_cplex(cpx):
+    """Create a copy of the model and copy changed parameters."""
     cpx_copy = Cplex(cpx)
     cpx_parameters = cpx.parameters.get_changed()
     for pname, pvalue in cpx_parameters:
@@ -333,6 +302,7 @@ def copy_cplex(cpx):
 
 
 def get_lp_relaxation(cpx):
+    """Return a copy of the model with integrality relaxed (LP)."""
     rlx = copy_cplex(cpx)
     if rlx.get_problem_type() is rlx.problem_type.MILP:
         rlx.set_problem_type(rlx.problem_type.LP)
@@ -340,18 +310,7 @@ def get_lp_relaxation(cpx):
 
 
 def add_mip_start(cpx, solution, effort_level=1, name=None):
-    """
-    :param cpx:
-    :param solution:
-    :param effort_level:    (must be one of the values of old_tests.MIP_starts.effort_level)
-                            1 <-> check_feasibility
-                            2 <-> solve_fixed
-                            3 <-> solve_MIP
-                            4 <-> repair
-                            5 <-> no_check
-    :param name:
-    :return: old_tests
-    """
+    """Add a MIP start vector to the model."""
     if isinstance(solution, np.ndarray):
         solution = solution.tolist()
 
@@ -373,22 +332,19 @@ CPX_MIP_PARAMETERS = {
     "node_limit": 9223372036800000000,  # Number of nodes to process before stopping,
     #
     "mipgap": np.finfo("float").eps,
-    # Sets a relative tolerance on the gap between the best integer objective and the objective of the best node remaining.
+    # Relative tolerance on gap between incumbent and best remaining node.
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/EpGap.html
     #
     "absmipgap": 0.9,  # np.finfo('float').eps,
-    # Sets an absolute tolerance on the gap between the best integer objective and the objective of the best node remaining.
-    # When this difference falls below the value of this parameter, the mixed integer optimization is stopped.
+    # Absolute tolerance on the gap to stop MIP search when satisfied.
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/EpAGap.html
     #
     "objdifference": 0.9,
-    # Used to update the cutoff each time a mixed integer solution is found. This value is subtracted from objective
-    # value of the incumbent update, so that the solver ignore solutions that will not improve the incumbent by at
-    # least this amount.
+    # Cutoff update slack to ignore negligible improvements to incumbent.
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/ObjDif.html#
     #
     "integrality_tolerance": 0.0,
-    # specifies the amount by which an variable can differ from an integer and be considered integer feasible. 0 is OK
+    # Integrality tolerance (0 treated as exact integer feasibility).
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/EpInt.html
     #
     "mipemphasis": 0,
@@ -417,7 +373,7 @@ CPX_MIP_PARAMETERS = {
     # 3     = Generate cover cuts very  aggressively
     #
     "zero_half_cuts": -1,
-    # Decides whether or not to generate zero-half cuts for the problem. (set to off since these are not effective)
+    # Toggle zero-half cuts (often not effective, disabled here).
     # https://www.ibm.com/support/knowledgecenter/en/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/ZeroHalfCuts.html
     # -1    = Do not generate MIR cuts
     # 0	    = Automatic: let CPLEX choose
@@ -425,7 +381,7 @@ CPX_MIP_PARAMETERS = {
     # 2	    = Generate MIR cuts aggressively
     #
     "mir_cuts": -1,
-    # Decides whether or not to generate mixed-integer rounding cuts for the problem. (set to off since these are not effective)
+    # Toggle mixed-integer rounding cuts (often not effective; disabled here)
     # https://www.ibm.com/support/knowledgecenter/en/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/MIRCuts.html
     # -1    = Do not generate zero-half cuts
     # 0	    = Automatic: let CPLEX choose; default
@@ -473,9 +429,9 @@ CPX_MIP_PARAMETERS = {
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/SolnPoolGap.html
     #
     "poolreplace": 2,
-    # Designates the strategy for replacing a solution in the solution pool when the solution pool has reached its capacity.
+    # Strategy for replacing solutions when the solution pool is full
     # https://www.ibm.com/support/knowledgecenter/SSSA5P_12.8.0/ilog.odms.cplex.help/CPLEX/Parameters/topics/SolnPoolReplace.html
-    # 0	= Replace the first solution (oldest) by the most recent solution; first in, first out; default
+    # 0	= Replace oldest (FIFO); default
     # 1	= Replace the solution which has the worst objective
     # 2	= Replace solutions in order to build a set of diverse solutions
     #
@@ -492,9 +448,8 @@ CPX_MIP_PARAMETERS = {
 }
 
 
-def set_cpx_display_options(
-    cpx, display_mip=True, display_parameters=False, display_lp=False
-):
+def set_cpx_display_options(cpx, display_mip=True, display_parameters=False, display_lp=False):
+    """Toggle CPLEX console output for MIP, simplex, and parameters."""
     cpx.parameters.mip.display.set(display_mip)
     cpx.parameters.simplex.display.set(display_lp)
     cpx.parameters.paramdisplay.set(display_parameters)
@@ -509,6 +464,7 @@ def set_cpx_display_options(
 
 
 def set_mip_parameters(cpx, param=CPX_MIP_PARAMETERS):
+    """Apply selected MIP parameters and display options to the model."""
     # get parameter handle
     p = cpx.parameters
 
@@ -572,6 +528,7 @@ def set_mip_parameters(cpx, param=CPX_MIP_PARAMETERS):
 
 
 def get_mip_parameters(cpx):
+    """Read back a subset of key MIP parameters from the model."""
     p = cpx.parameters
 
     param = {
@@ -611,8 +568,7 @@ def get_mip_parameters(cpx):
 
 
 def toggle_mip_preprocessing(cpx, toggle=True):
-    """toggles pre-processing on/off for debugging / computational experiments"""
-
+    """Toggles pre-processing on/off for debugging / computational experiments."""
     # presolve
     # old_tests.parameters.preprocessing.presolve.help()
     # 0 = off
@@ -665,13 +621,7 @@ def toggle_mip_preprocessing(cpx, toggle=True):
 
 
 def set_mip_cutoff_values(cpx, objval, objval_increment):
-    """
-
-    :param cpx:
-    :param objval:
-    :param objval_increment:
-    :return:
-    """
+    """Set upper cutoff and absolute tolerances based on incumbent progress."""
     assert objval >= 0.0
     assert objval_increment >= 0.0
     p = cpx.parameters
@@ -683,12 +633,7 @@ def set_mip_cutoff_values(cpx, objval, objval_increment):
 
 # Stopping Conditions
 def set_mip_max_gap(cpx, max_gap=None):
-    """
-    sets the largest value of the relative optimality gap required to stop solving a MIP
-    :param cpx:
-    :param max_gap:
-    :return:
-    """
+    """Set the largest value of the relative optimality gap to stop solving a MIP."""
     if max_gap is not None:
         max_gap = float(max_gap)
         max_gap = min(max_gap, cpx.parameters.mip.tolerances.mipgap.max())
@@ -702,12 +647,7 @@ def set_mip_max_gap(cpx, max_gap=None):
 
 
 def set_mip_time_limit(cpx, time_limit=None):
-    """
-
-    :param cpx:
-    :param time_limit:
-    :return:
-    """
+    """Set the time limit (seconds) for MIP solving."""
     max_time_limit = float(cpx.parameters.timelimit.max())
 
     if time_limit is None:
@@ -722,12 +662,7 @@ def set_mip_time_limit(cpx, time_limit=None):
 
 
 def set_mip_node_limit(cpx, node_limit=None):
-    """
-
-    :param cpx:
-    :param node_limit:
-    :return:
-    """
+    """Set the node limit for MIP branch-and-bound."""
     max_node_limit = cpx.parameters.mip.limits.nodes.max()
     if node_limit is not None:
         node_limit = int(node_limit)
@@ -742,12 +677,7 @@ def set_mip_node_limit(cpx, node_limit=None):
 
 # Debugging
 def solution_df(cpx, names=None):
-    """
-    create a data frame with the current solution for a CPLEX object
-    :param cpx:
-    :param names:
-    :return:
-    """
+    """Create a DataFrame with the current solution for a CPLEX object."""
     assert isinstance(cpx, Cplex)
     if names is None:
         names = cpx.variables.get_names()

@@ -7,6 +7,7 @@ authors = [
   { name = "Bogdan Kulynych",   email = "bogdan@kulyny.ch" },
   { name = "Avni Kothrai",   email = "akothari@ucsd.edu" },
   { name = "Seung Hyun Cheon", email = "scheon@ucsd.edu" },
+  { name = "Meredith Stewart", email = "mds010@ucds.edu" }
 ]
 license = "MIT"
 readme = "README.md"
@@ -18,20 +19,68 @@ dependencies = [
   "tqdm~=4.67.1",
   "prettytable~=3.14.0",
   "h5py~=3.12.1",
-  "matplotlib~=3.10.0"
+  "matplotlib~=3.10.0",
+  "pyscipopt>=5.6.0",
+  "cplex>=22.1.1.2",
 ]
 
-[project.optional-dependencies]
-cplex   = [ "cplex~=22.1.1.0" ]
-explain = [ "lime~=0.2.0", "shap~=0.46.0" ]
-recourse = [ "recourse~=1.0.0", "dice-ml~=0.9" ]
-dev     = [
-  "ipdb~=0.13.13", "pytest~=8.3.4", "jupyter~=1.1.1",
-  "scikit-learn==1.5.2", "xgboost==2.1.4", "imbalanced-learn~=0.13.0",
-  "dill==0.3.9", "rich~=13.9.4", "pypdf2~=3.0.1",
-  "psutil~=6.1.1", "matplotlib~=3.10.0",
+[dependency-groups]
+explain = [
+    "lime~=0.2.0",
+    "shap~=0.46.0"
 ]
+recourse = [
+    "recourse~=1.0.0",
+    "dice-ml~=0.9"
+]
+verification = [
+    "rpy2==3.5.2",
+]
+dev = [
+    "ipdb~=0.13.13",
+    "pytest~=8.3.4",
+    "jupyter~=1.1.1",
+    "scikit-learn==1.5.2",
+    "xgboost==2.1.4",
+    "imbalanced-learn~=0.13.0",
+    "dill==0.3.9",
+    "rich~=13.9.4",
+    "pypdf2~=3.0.1",
+    "psutil~=6.1.1",
+    "matplotlib~=3.10.0",
+    "tabulate~=0.9.0",
+    "plotnine==0.14.5"
+]
+
+[tool.uv]
+default-groups = ["dev"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # import sorting
+    "B",      # flake8-bugbear
+    "D",      # pydocstyle
+]
+ignore = [
+    "D104",  # Missing docstring in public package
+    "E731",  # Leave assigned lambdas for now
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
