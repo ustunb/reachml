@@ -17,8 +17,6 @@ import rich
 from prettytable.colortable import ColorTable
 from sklearn.preprocessing import StandardScaler
 
-from .ext.training import train_model
-
 
 def has_feature_vector_discrete(X, x):
     """Return True if the exact vector `x` appears in `X` (discrete match)."""
@@ -155,56 +153,6 @@ def parse_attribute_name(dummy_names, default_name=""):
     out = commonprefix(dummy_names)
     if len(out) == 0:
         out = default_name
-    return out
-
-
-def check_processing_loss(
-    data,
-    data_raw,
-    model_type="logreg",
-    fold_id="K05N01",
-    fold_num_test=1,
-    rebalance="over",
-    seed=2338,
-    **kwargs,
-):
-    """Compare model loss between processed and raw datasets.
-
-    Trains models on the same CV split for both datasets and returns the
-    fitted models to enable downstream comparison.
-
-    Args:
-        data: Processed dataset object with `split` and `cvindices`.
-        data_raw: Raw dataset object aligned with `data`.
-        model_type: Model type identifier (e.g., "logreg", "xgb").
-        fold_id: Cross-validation fold id.
-        fold_num_test: Number of test folds.
-        rebalance: Rebalancing strategy identifier.
-        seed: Random seed for training.
-        **kwargs: Additional training options (e.g., `fold_num_validation`).
-
-    Returns:
-        Dict with keys `model` and `model_raw` containing the fitted models.
-    """
-    assert np.array_equal(data.cvindices[fold_id], data_raw.cvindices[fold_id])
-    data.split(fold_id=fold_id, fold_num_validation=None, fold_num_test=fold_num_test)
-    data_raw.split(
-        fold_id=fold_id,
-        fold_num_validation=kwargs.get("fold_num_validation"),
-        fold_num_test=fold_num_test,
-    )
-
-    if model_type == "logreg":
-        kwargs["rescale"] = True
-    elif model_type == "xgb":
-        kwargs["label_encoding"] = (0, 1)
-
-    out = {
-        "model": train_model(data, model_type=model_type, rebalance=rebalance, seed=seed, **kwargs),
-        "model_raw": train_model(
-            data_raw, model_type=model_type, rebalance=rebalance, seed=seed, **kwargs
-        ),
-    }
     return out
 
 
