@@ -371,6 +371,7 @@ class SampledReachableSet(ReachableSet):
 
         return len(vals)
 
+    # TODO: #4 update function to match paper @harrycheon
     def calculate_n(self, alpha, **kwargs):
         """Calculate number of samples to draw."""
         return np.ceil(np.log(alpha) / np.log(1 - self.resp_thresh)).astype(int)
