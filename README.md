@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2308.12820-b31b1b.svg)](https://arxiv.org/abs/2308.12820)
 [![arXiv](https://img.shields.io/badge/arXiv-2410.22598-b31b1b.svg)](https://arxiv.org/abs/2410.22598)
+[![arXiv](https://img.shields.io/badge/arXiv-2410.22598-b31b1b.svg)](https://arxiv.org/abs/2507.02169)
 [![CI](https://github.com/ustunb/reachml/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/ci.yml)
 
 `reachml` is a library for recourse verification.
@@ -19,7 +20,9 @@ You can install the library as follows:
 pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
 ```
 
-Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/docs/cplex_instructions.md).
+Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://www.ibm.com/support/pages/how-do-i-download-cplex-optimization-studio).
+
+We now allow [SCIP](https://pyscipopt.readthedocs.io/en/latest/) to run as well - it installed with the python package.
 
 
 ## Responsiveness Scores Quickstart
@@ -174,6 +177,8 @@ Given a classifier `clf` with a predict method, you can test if a point has reco
 For more examples, check out [this
 script](https://github.com/ustunb/reachml/blob/main/research/iclr2024/scripts/setup_dataset_actionset_fico.py) which sets up the action set for the FICO dataset.
 
+We're actively working to improve this package and make it more useful. If you come across bugs, have comments, or want to help, let us know. We welcome any and all contributions! For more info on how to contribute, check out these guidelines. Thank you community!
+
 ### Resources and Citation
 
 For more about recourse verification, check out our paper ICLR 2024 spotlight paper: [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
@@ -190,3 +195,7 @@ If you use recourse verification in your research, we would appreciate a citatio
 ```
 
 The code for the paper is available under [research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/).
+
+## Contributing
+
+We're actively working to improve this package and make it more useful. If you come across bugs, have comments, or want to help, let us know. We welcome any and all contributions! For more info on how to contribute, check out [these guidelines](https://github.com/ustunb/actionable-recourse/blob/master/CONTRIBUTING.md). Thank you community!
