@@ -18,6 +18,7 @@ class ThermometerEncoding(ReachabilityConstraint):
                       x[1] = 1[Z ≥ z[1]]
                       ...
                       x[m-1] = 1[Z ≥ z[m-1]]
+                      
     Here:
     - z[0] ≤ z[1] ≤ ... z[m-1] are a set of increasing threshold values on Z
     - x[k] \in {0,1} is a binary variable

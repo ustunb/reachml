@@ -30,7 +30,8 @@ results_dir.mkdir(exist_ok=True)
 def get_data_csv_file(data_name, **kwargs):
     """:param data_name: string containing name of the dataset
     :param kwargs: used to catch other args when unpacking dictionaries
-                   this allows us to call this function as get_results_file_name(**settings)
+        This allows us to call this function as
+        ``get_data_csv_file_name(**settings)``.
     :return:
     """
     assert isinstance(data_name, str) and len(data_name) > 0
@@ -41,7 +42,8 @@ def get_data_csv_file(data_name, **kwargs):
 def get_data_file(data_name, action_set_name, **kwargs):
     """:param data_name: string containing name of the dataset
     :param kwargs: used to catch other args when unpacking dictionaries
-                   this allows us to call this function as get_results_file_name(**settings)
+        This allows us to call this function as
+        ``get_data_file(**settings)``.
     :return:
     """
     assert isinstance(data_name, str) and len(data_name) > 0
@@ -152,7 +154,8 @@ def get_reachable_db_file(data_name, action_set_name, **kwargs):
     :param data_name: string containing name of the dataset
     :param action_set_name: string containing name of the action set
     :param kwargs: used to catch other args when unpacking dictionaies
-                   this allows us to call this function as get_results_file_name(**settings)
+        This allows us to call this function as
+        ``get_reachable_db_file_name(**settings)``.
 
     :return: Path of results object
     """

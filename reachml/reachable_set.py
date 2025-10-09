@@ -355,8 +355,7 @@ class SampledReachableSet(ReachableSet):
 
         Args:
             **kwargs: keyword arguments
-                alpha (float, optional): significance level for sampling
-                                         (between 0 and 1)
+                alpha (float, optional): significance level for sampling (between 0 and 1)
                 n (int, optional): number of samples to draw, overrides alpha
         """
         assert self.generator is not None, "Generator not initialized"

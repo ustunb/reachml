@@ -24,75 +24,6 @@ Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/pro
 
 We now allow [SCIP](https://pyscipopt.readthedocs.io/en/latest/) to run as well - it installed with the python package.
 
-
-## Responsiveness Scores Quickstart
-
-The following example shows how to generate responsivneess scores using `ResponsivenessScorer`.
-
-```python
-import numpy as np
-import xgboost
-
-import reachml
-
-# load dataset and train xgboost classifier
-X, y = reachml.datasets.givemecredit_cts_slim(label=[0, 1])
-model = xgboost.XGBClassifier().fit(X, y)
-
-# create simple action set
-A = reachml.ActionSet(X)
-
-# Immutable features
-A["HistoryOfDelinquency"].actionable = False
-A["HistoryOfLatePayment"].actionable = False
-
-# MonthlyIncome can change +- 5000
-A["MonthlyIncome"].step_ub = 5000
-A["MonthlyIncome"].step_lb = -5000
-
-# CreditLineUtilization can change +- 1
-A["CreditLineUtilization"].step_ub = -1
-A["CreditLineUtilization"].step_lb = 1
-
-# Min CreditLineUtilization is 0
-A["CreditLineUtilization"].lb = 0
-
-# Calculate responsiveness scores
-# Since some features are continuous, we set sample size: n = 100
-scorer = reachml.ResponsivenessScorer(A)
-scores = scorer(X, model, n=100)
-
-# List of adverse outcome indices
-rejected = np.where(model.predict(X) == 0)[0]
-
-# Plot output (pass in index)
-scorer.plot(x_idx=rejected[0])
-```
-<p align="center">
-  <img width="616" src="./docs/figures/resp_demo.png" />
-</p>
-
-### Resources and Citation
-
-For more about responsiveness scores, check out our paper ICLR 2025 paper: [Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse](https://openreview.net/forum?id=wsWCVrH9dv)
-
-If you use responsiveness scores in your research, we would appreciate a citation:
-
-```
-@inproceedings{
-    cheon2025feature,
-    title={Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse},
-    author={Seung Hyun Cheon and Anneke Wernerfelt and Sorelle Friedler and Berk Ustun},
-    booktitle={The Thirteenth International Conference on Learning Representations},
-    year={2025},
-    url={https://openreview.net/forum?id=wsWCVrH9dv}
-}
-```
-
-The code for the paper is available under [research/iclr2025](https://github.com/ustunb/reachml/tree/main/research/iclr2025/).
-
-
-
 ## Reachable Sets Quickstart
 
 The following example shows how to specify actionability constraints using `ActionSet` and to build a database of `ReachableSet` for each point.
@@ -181,7 +112,7 @@ We're actively working to improve this package and make it more useful. If you c
 
 ### Resources and Citation
 
-For more about recourse verification, check out our paper ICLR 2024 spotlight paper: [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
+For more about recourse verification, check out our ICLR 2024 spotlight paper: [Prediction without Preclusion](https://openreview.net/forum?id=SCQfYpdoGE)
 
 If you use recourse verification in your research, we would appreciate a citation:
 ```
@@ -195,6 +126,134 @@ If you use recourse verification in your research, we would appreciate a citatio
 ```
 
 The code for the paper is available under [research/iclr2024](https://github.com/ustunb/reachml/tree/main/research/iclr2024/).
+
+## Responsiveness Scores Quickstart
+
+The following example shows how to generate responsivneess scores using `ResponsivenessScorer`.
+
+```python
+import numpy as np
+import xgboost
+
+import reachml
+
+# load dataset and train xgboost classifier
+X, y = reachml.datasets.givemecredit_cts_slim(label=[0, 1])
+model = xgboost.XGBClassifier().fit(X, y)
+
+# create simple action set
+A = reachml.ActionSet(X)
+
+# Immutable features
+A["HistoryOfDelinquency"].actionable = False
+A["HistoryOfLatePayment"].actionable = False
+
+# MonthlyIncome can change +- 5000
+A["MonthlyIncome"].step_ub = 5000
+A["MonthlyIncome"].step_lb = -5000
+
+# CreditLineUtilization can change +- 1
+A["CreditLineUtilization"].step_ub = -1
+A["CreditLineUtilization"].step_lb = 1
+
+# Min CreditLineUtilization is 0
+A["CreditLineUtilization"].lb = 0
+
+# Calculate responsiveness scores
+# Since some features are continuous, we set sample size: n = 100
+scorer = reachml.ResponsivenessScorer(A)
+scores = scorer(X, model, n=100)
+
+# List of adverse outcome indices
+rejected = np.where(model.predict(X) == 0)[0]
+
+# Plot output (pass in index)
+scorer.plot(x_idx=rejected[0])
+```
+<p align="center">
+  <img width="616" src="./docs/figures/resp_demo.png" />
+</p>
+
+### Resources and Citation
+
+For more about responsiveness scores, check out our ICLR 2025 paper: [Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse](https://openreview.net/forum?id=wsWCVrH9dv)
+
+If you use responsiveness scores in your research, we would appreciate a citation:
+
+```
+@inproceedings{
+    cheon2025feature,
+    title={Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse},
+    author={Seung Hyun Cheon and Anneke Wernerfelt and Sorelle Friedler and Berk Ustun},
+    booktitle={The Thirteenth International Conference on Learning Representations},
+    year={2025},
+    url={https://openreview.net/forum?id=wsWCVrH9dv}
+}
+```
+
+The code for the paper is available under [research/iclr2025](https://github.com/ustunb/reachml/tree/main/research/iclr2025/).
+
+
+## Auditing Quickstart
+The following example shows how to generate responsivness audits using `ResponsivenessAuditor`.
+
+```python
+import pandas as pd
+from reachml import ReachableSetDatabase
+from reachml.ext import fileutils
+from reachml.ext.data import BinaryClassificationDataset
+from reachml.paths import *
+from reachml.ext.training import *
+from reachml.auditor import ResponsivenessAuditor
+
+# load action set and dataset
+credit_action = fileutils.load(get_action_set_file(data_name="givemecredit", action_set_name="complex_nD"))
+print(credit_action)
+
+credit_dataset = fileutils.load(get_data_file(data_name="givemecredit", action_set_name="complex_nD"))
+
+
+# generate reachable set database
+credit_database = ReachableSetDatabase(credit_action)
+credit_database.generate(credit_dataset.X)
+
+# train model
+credit_dataset.split(
+    fold_id="K05N01",
+    fold_num_validation=None,
+    fold_num_test=5
+)
+credit_model = train_model(credit_dataset, model_type="logreg", random_state=0)
+
+
+# run responsiveness audit
+# we use the dataset and sampled points from above
+auditor = ResponsivenessAuditor(credit_database, clf=credit_model["model"])
+auditor(credit_dataset.X, credit_dataset.y)
+pd.DataFrame(auditor.audit['df']).head()
+```
+<p align="center">
+  <img width="616" src="./docs/figures/resp_demo.png" />
+</p>
+
+### Resources and Citations
+For more about responsiveness audits, check out our 2025 paper: [Statistical Inference for Responsiveness Verification](https://arxiv.org/pdf/2507.02169)
+
+If you use responsiveness audits in your research, we would appreciate a citation:
+
+```
+@misc{cheon2025statisticalinferenceresponsivenessverification,
+      title={Statistical Inference for Responsiveness Verification}, 
+      author={Seung Hyun Cheon and Meredith Stewart and Bogdan Kulynych and Tsui-Wei Weng and Berk Ustun},
+      year={2025},
+      eprint={2507.02169},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2507.02169}, 
+}
+```
+
+The code for the paper is available under [research/neurips2025](https://github.com/ustunb/reachml/tree/main/research/neurips2025/).
 
 ## Contributing
 
