@@ -1,6 +1,6 @@
 [project]
 name = "reachml"
-version = "0.2.1.1"
+version = "0.2.1.2"
 description = "Recourse verification with reachable sets"
 authors = [
   { name = "Berk Ustun", email = "berk@ucsd.edu" },
