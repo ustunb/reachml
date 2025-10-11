@@ -1,6 +1,5 @@
 [project]
 name = "reachml"
-dynamic = ["version"]
 description = "Recourse verification with reachable sets"
 authors = [
   { name = "Berk Ustun", email = "berk@ucsd.edu" },
@@ -21,11 +20,29 @@ dependencies = [
   "h5py~=3.12.1",
   "matplotlib~=3.10.0",
   "pyscipopt>=5.6.0",
-  "cplex>=22.1.2",
-  "docplex>=2.30.251",
 ]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+cplex = [ "docplex", "cplex>=22.1.2" ]
 
 [dependency-groups]
+cplex = [
+    "docplex",
+    "cplex>=22.1.2"
+]
 explain = [
     "lime~=0.2.0",
     "shap~=0.46.0"
@@ -54,7 +71,7 @@ dev = [
 ]
 
 [tool.uv]
-default-groups = ["dev"]
+default-groups = ["dev", "cplex"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
