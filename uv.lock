@@ -1908,7 +1908,6 @@ wheels = [
 
 [[package]]
 name = "reachml"
-version = "0.2.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "cplex" },

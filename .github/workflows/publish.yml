@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 env:
-  PYTHON_VESRION: "3.12"   # single source of truth
+  PYTHON_VERSION: "3.12"   # single source of truth
 
 jobs:
   build:
