@@ -1,17 +1,17 @@
 [project]
 name = "reachml"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Recourse verification with reachable sets"
 authors = [
   { name = "Berk Ustun", email = "berk@ucsd.edu" },
   { name = "Bogdan Kulynych",   email = "bogdan@kulyny.ch" },
   { name = "Avni Kothrai",   email = "akothari@ucsd.edu" },
-  { name = "Seung Hyun Cheon", email = "scheon@ucsd.edu" },
+  { name = "Harry Cheon", email = "scheon@ucsd.edu" },
   { name = "Meredith Stewart", email = "mds010@ucds.edu" }
 ]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.10, <3.13"
 
 dependencies = [
   "numpy~=2.1.3",
@@ -21,7 +21,8 @@ dependencies = [
   "h5py~=3.12.1",
   "matplotlib~=3.10.0",
   "pyscipopt>=5.6.0",
-  "cplex>=22.1.1.2",
+  "cplex>=22.1.2",
+  "docplex>=2.30.251",
 ]
 
 [dependency-groups]
@@ -56,8 +57,14 @@ dev = [
 default-groups = ["dev"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "reachml/_version.py"   # creates a file with __version__
 
 [tool.ruff]
 target-version = "py310"
