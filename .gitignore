@@ -44,7 +44,6 @@ skltemplate/
 examples/paper/results
 
 # jekyll
-*.yml
 .nojekyll
 
 # Notes
