@@ -6,6 +6,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
@@ -118,6 +119,9 @@ class ResponsivenessScorer(ABC):
         Returns:
             Numpy array of shape (n_samples, n_features) with responsiveness scores.
         """
+        if isinstance(X, pd.DataFrame):
+            X = X.to_numpy()
+
         out = np.zeros((len(X), len(self.action_set)))
 
         for i, x in tqdm(enumerate(X), total=len(X)):
