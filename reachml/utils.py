@@ -13,9 +13,7 @@ from os.path import commonprefix
 import numpy as np
 import pandas as pd
 import prettytable
-import rich
 from prettytable.colortable import ColorTable
-from sklearn.preprocessing import StandardScaler
 
 
 def has_feature_vector_discrete(X, x):
@@ -305,76 +303,6 @@ def tally_predictions(i, database, data, predictor, target=1):
     point_df["flip"] = database[x].scores(point_mask=S, weigh_changes=False)
     point_df["same"] = database[x].scores(point_mask=~S, weigh_changes=False)
     return point_df
-
-
-def visualize_diff(x, x_prime):
-    """Pretty-print row-wise differences between two aligned Series/DataFrames.
-
-    Args:
-        x: Pandas Series (original).
-        x_prime: Pandas Series (modified).
-    """
-    df = pd.DataFrame(
-        index=x.index,
-        columns=["x", "x'"],
-        data=np.vstack([x.values.squeeze(), x_prime.squeeze()]).T,
-    )
-    max_index_length = max([len(s) for s in df.index])
-    max_value_length = df[["x", "x'"]].astype(str).applymap(len).max().max().astype(int)
-
-    # Add a column 'Difference' to highlight differing rows
-    df["Difference"] = np.where(df["x"] != df["x'"], "DIFFERENT", "")
-    for index, row in df.iterrows():
-        padded_index = f"{index: <{max_index_length}}"
-        padded_x = f"{row['x']: >{max_value_length + 1}}"
-        x_prime_key = "x'"
-        padded_x_prime = f"{row[x_prime_key]: >{max_value_length + 1}}"
-        if row["Difference"] == "DIFFERENT":
-            rich.print(padded_index, padded_x, "[red]{}[/red]".format(padded_x_prime))
-        else:
-            rich.print(padded_index, padded_x, padded_x_prime)
-
-
-###
-def undo_coefficient_scaling(clf=None, coefficients=None, intercept=0.0, scaler=None):
-    """Convert scaled model coefficients back to the original feature scale.
-
-    Given a linear model trained on standardized features, compute the
-    equivalent coefficients and intercept for the unscaled data.
-
-    Args:
-        clf: Sklearn linear classifier with `coef_`/`intercept_` (optional if
-            `coefficients` and `intercept` are provided).
-        coefficients: 1D coefficients array.
-        intercept: Intercept term.
-        scaler: `sklearn.preprocessing.StandardScaler` instance.
-
-    Returns:
-        Tuple `(w, b)` of unscaled coefficients and intercept.
-    """
-    if coefficients is None:
-        assert clf is not None
-        assert intercept == 0.0
-        assert hasattr(clf, "coef_")
-        coefficients = clf.coef_
-        intercept = clf.intercept_ if hasattr(clf, "intercept_") else 0.0
-
-    if scaler is None:
-        w = np.array(coefficients)
-        b = float(intercept)
-    else:
-        isinstance(scaler, StandardScaler)
-        x_shift = np.array(scaler.mean_)
-        x_scale = np.sqrt(scaler.var_)
-        w = coefficients / x_scale
-        w = np.array(w).flatten()
-        w[np.isnan(w)] = 0
-
-        b = intercept - np.dot(w, x_shift)
-        b = float(b)
-    # coefficients_unnormalized = scaler.inverse_transform(coefficients.reshape(1, -1))
-    return w, b
-
 
 ### MIP Settings
 def _check_solver_cpx():

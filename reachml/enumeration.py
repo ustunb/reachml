@@ -9,7 +9,6 @@ import numpy as np
 
 from .action_set import ActionSet
 from .mip import EnumeratorMIP
-from .mip.backends.cplex_utils import set_mip_node_limit, set_mip_time_limit
 from .utils import DEFAULT_SOLVER
 
 
@@ -223,6 +222,15 @@ class ReachableSetEnumerationMIP:
         max_points = float("inf") if max_points is None else max_points
 
         # update time limit and node limit
+        if self.mip_obj.solver == "cplex":
+            from .mip.backends.cplex_utils import set_mip_node_limit, set_mip_time_limit
+        elif self.mip_obj.solver == "scip":
+            from .mip.backends.scip_utils import set_mip_node_limit, set_mip_time_limit
+        else:
+            raise NotImplementedError(
+                    f"setting time/node limit not implemented for solver {self.mip_obj.solver}"
+                )
+
         if time_limit is not None:
             self.mip = set_mip_time_limit(self.mip, time_limit)
         if node_limit is not None:

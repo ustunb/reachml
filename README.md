@@ -1,10 +1,10 @@
 # reachml
 
-[![python](https://img.shields.io/badge/Python-3.10-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
+[![python](https://img.shields.io/pypi/pyversions/reachml)](https://pypi.org/pypi/reachml/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2308.12820-b31b1b.svg)](https://arxiv.org/abs/2308.12820)
 [![arXiv](https://img.shields.io/badge/arXiv-2410.22598-b31b1b.svg)](https://arxiv.org/abs/2410.22598)
-[![CI](https://github.com/ustunb/reachml/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/ci.yml)
+[![test](https://github.com/ustunb/reachml/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/ustunb/reachml/actions/workflows/test.yml)
 
 `reachml` is a library for recourse verification.
 
@@ -16,10 +16,21 @@
 
 You can install the library as follows:
 ```
-pip install "git+https://github.com/ustunb/reachml#egg=reachml[cplex]"
+pip install reachml
 ```
 
-Many of the functions in `reach-ml` will require [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio) to run properly. The command above will install CPLEX Community Edition. The community edition has a strict limit on the number of constraints it can support. To avoid these, you will want install reachml without the cplex option, and download and install the full version of IBM CPLEX [following these instructions](https://github.com/ustunb/docs/cplex_instructions.md).
+### CPLEX
+
+The default solver in the package is [SCIP](https://www.scipopt.org), a source-available academic software with an open-source [Python API](https://github.com/scipopt/PySCIPOpt). If you want to use [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio), install `reachml` with:
+```
+pip install reachml[cplex]
+```
+The command above will install the [CPLEX Community Edition Python API](https://pypi.org/project/cplex/). The community edition has a strict limit on the size of models (e.g., number of constraints) it can support. To avoid these limits, you can purchase CPLEX and upgrade the Python API by running (on **CPLEX v22.1.2 and above**):
+```
+docplex config --upgrade PATH_TO_CPLEX_INSTALLATION    # e.g., ~/Applications/CPLEX_StudioXXXX
+```
+
+CPLEX Optimization Studio is free for students and academics through [IBM SkillsBuild](https://skillsbuild.org/) ([full instructions](https://community.ibm.com/community/user/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students)).
 
 
 ## Responsiveness Scores Quickstart
@@ -71,7 +82,7 @@ scorer.plot(x_idx=rejected[0])
 
 ### Resources and Citation
 
-For more about responsiveness scores, check out our paper ICLR 2025 paper: [Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse](https://openreview.net/forum?id=wsWCVrH9dv)
+For more about responsiveness scores, check out our paper ICLR 2025 paper: [Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse](https://arxiv.org/abs/2410.22598)
 
 If you use responsiveness scores in your research, we would appreciate a citation:
 
@@ -79,7 +90,7 @@ If you use responsiveness scores in your research, we would appreciate a citatio
 @inproceedings{
     cheon2025feature,
     title={Feature Responsiveness Scores: Model-Agnostic Explanations for Recourse},
-    author={Seung Hyun Cheon and Anneke Wernerfelt and Sorelle Friedler and Berk Ustun},
+    author={Harry Cheon and Anneke Wernerfelt and Sorelle Friedler and Berk Ustun},
     booktitle={The Thirteenth International Conference on Learning Representations},
     year={2025},
     url={https://openreview.net/forum?id=wsWCVrH9dv}
