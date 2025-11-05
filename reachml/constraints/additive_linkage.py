@@ -143,3 +143,26 @@ class AdditiveLinkage(ActionabilityConstraint):
         )
 
         return cpx, indices
+
+    def add_to_scip(self, scip, indices, x):
+        from pyscipopt import Model
+        assert isinstance(scip, Model)
+
+        source_idx = self.indices[0]
+        target_indices = self.indices[1:]
+
+        a_source = indices.get_var(scip, f"a[{source_idx}]")
+        c_targets = [indices.get_var(scip, f"c[{i}]") for i in target_indices]
+
+        expr = self.source_coeff * a_source
+        for coeff, cvar in zip(self.target_coeffs, c_targets):
+            expr -= coeff * cvar
+
+        if self.linkage_type == "E":
+            scip.addCons(expr == 0.0, name=f"additive_linkage_{self.source}")
+        elif self.linkage_type == "G":
+            scip.addCons(expr >= 0.0, name=f"additive_linkage_{self.source}")
+        else:
+            scip.addCons(expr <= 0.0, name=f"additive_linkage_{self.source}")
+
+        return scip, indices

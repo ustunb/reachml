@@ -27,8 +27,8 @@ settings = {
     "data_name": "givemecredit",
     #"action_set_names": ["simple_1D", "complex_1D", "complex_nD"],
     "action_set_names": ["complex_nD"],
-    "check_processing_loss": True,
-    "generate_reachable_sets": False,
+    "check_processing_loss": False,
+    "generate_reachable_sets": True,
     "fold_id": "K05N01",
     "random_seed": 2338,
     }

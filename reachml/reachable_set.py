@@ -282,6 +282,10 @@ class EnumeratedReachableSet(ReachableSet):
             values = np.unique(values, axis=0)
 
         if actions:
+            print(f"associated values: {values}")
+            for val in values:
+                print(f" action: {val}")
+                print(type(val))
             values = self._x + values
 
         if check_exists:
@@ -401,6 +405,10 @@ class SampledReachableSet(ReachableSet):
         assert values.shape[1] == self.d
 
         if actions:
+            print(f"associated values: {values}")
+            for val in values:
+                print(f" action: {val}")
+                print(type(val))
             values = self._x + values
 
         if self._X is None:
